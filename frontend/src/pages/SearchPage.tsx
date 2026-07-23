@@ -1,0 +1,192 @@
+import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { SearchBar } from '../components/common/SearchBar';
+import { MovieCard } from '../components/common/MovieCard';
+import { MovieGridSkeleton } from '../components/common/Skeleton';
+import { searchApi, recApi, movieApi } from '../api/client';
+import { Movie, RecommendationItem } from '../types';
+import { FunnelIcon, SparklesIcon } from '@heroicons/react/24/outline';
+
+export const SearchPage: React.FC = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialQuery = searchParams.get('q') || '';
+
+  const [query, setQuery] = useState(initialQuery);
+  const [isSemantic, setIsSemantic] = useState(false);
+  const [movies, setMovies] = useState<Movie[]>([]);
+  const [semanticResults, setSemanticResults] = useState<RecommendationItem[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [genres, setGenres] = useState<string[]>([]);
+
+  // Filter states
+  const [selectedGenre, setSelectedGenre] = useState('');
+  const [selectedYear, setSelectedYear] = useState('');
+  const [minRating, setMinRating] = useState('0');
+  const [sortBy, setSortBy] = useState('popularity');
+
+  useEffect(() => {
+    movieApi.getGenres().then(setGenres).catch(console.error);
+  }, []);
+
+  useEffect(() => {
+    const q = searchParams.get('q') || '';
+    setQuery(q);
+    executeSearch(q);
+  }, [searchParams, selectedGenre, selectedYear, minRating, sortBy, isSemantic]);
+
+  const executeSearch = async (searchQuery: string) => {
+    setLoading(true);
+    try {
+      if (isSemantic && searchQuery.trim()) {
+        const res = await recApi.postSemanticSearch(searchQuery, 20);
+        setSemanticResults(res.recommendations);
+        setMovies([]);
+      } else {
+        const params: any = {
+          sort: sortBy,
+          min_rating: parseFloat(minRating),
+        };
+        if (selectedGenre) params.genre = selectedGenre;
+        if (selectedYear) params.year = parseInt(selectedYear);
+
+        const res = searchQuery.trim()
+          ? await searchApi.search(searchQuery, params)
+          : await movieApi.getMovies(params);
+
+        setMovies(res.items);
+        setSemanticResults([]);
+      }
+    } catch (err) {
+      console.error('Search failed', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSearchSubmit = (newQuery: string) => {
+    setSearchParams({ q: newQuery });
+  };
+
+  return (
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+      {/* Search Header */}
+      <div className="space-y-4 max-w-3xl mx-auto text-center">
+        <h1 className="text-3xl sm:text-4xl font-extrabold text-white font-['Outfit']">
+          Search & Discover
+        </h1>
+        <SearchBar
+          autoFocus
+          placeholder={isSemantic ? 'Ask AI e.g. "movies about artificial intelligence and space"' : 'Search title, overview, cast, director...'}
+          onSearchSubmit={handleSearchSubmit}
+        />
+
+        {/* Semantic Toggle */}
+        <div className="flex items-center justify-center gap-3 pt-2">
+          <button
+            type="button"
+            onClick={() => setIsSemantic(!isSemantic)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold transition-all border ${
+              isSemantic
+                ? 'bg-gradient-to-r from-purple-600 to-indigo-600 border-indigo-400 text-white shadow-lg shadow-indigo-500/30'
+                : 'bg-[var(--color-surface-2)] border-[var(--color-border)] text-gray-400 hover:text-white'
+            }`}
+          >
+            <SparklesIcon className="w-4 h-4" />
+            {isSemantic ? 'Semantic Natural Language Search ON' : 'Switch to Semantic AI Search'}
+          </button>
+        </div>
+      </div>
+
+      {/* Filter Bar */}
+      <div className="card p-4 flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-2 text-sm font-semibold text-gray-300">
+          <FunnelIcon className="w-5 h-5 text-[var(--color-primary-light)]" />
+          Filters:
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Genre Filter */}
+          <select
+            value={selectedGenre}
+            onChange={(e) => setSelectedGenre(e.target.value)}
+            className="input text-xs py-2 px-3 w-auto bg-[var(--color-surface-2)]"
+          >
+            <option value="">All Genres</option>
+            {genres.map((g) => (
+              <option key={g} value={g}>{g}</option>
+            ))}
+          </select>
+
+          {/* Year Filter */}
+          <select
+            value={selectedYear}
+            onChange={(e) => setSelectedYear(e.target.value)}
+            className="input text-xs py-2 px-3 w-auto bg-[var(--color-surface-2)]"
+          >
+            <option value="">All Years</option>
+            {Array.from({ length: 30 }, (_, i) => 2026 - i).map((y) => (
+              <option key={y} value={y.toString()}>{y}</option>
+            ))}
+          </select>
+
+          {/* Rating Filter */}
+          <select
+            value={minRating}
+            onChange={(e) => setMinRating(e.target.value)}
+            className="input text-xs py-2 px-3 w-auto bg-[var(--color-surface-2)]"
+          >
+            <option value="0">Min Rating: Any</option>
+            <option value="7">7.0+ Stars</option>
+            <option value="8">8.0+ Stars</option>
+          </select>
+
+          {/* Sort By */}
+          {!isSemantic && (
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="input text-xs py-2 px-3 w-auto bg-[var(--color-surface-2)]"
+            >
+              <option value="popularity">Most Popular</option>
+              <option value="weighted_rating">Top Rated</option>
+              <option value="release_year">Newest First</option>
+            </select>
+          )}
+        </div>
+      </div>
+
+      {/* Results Grid */}
+      {loading ? (
+        <MovieGridSkeleton count={10} />
+      ) : isSemantic && semanticResults.length > 0 ? (
+        <div className="space-y-4">
+          <h2 className="text-xl font-bold text-white font-['Outfit']">Semantic AI Matches</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {semanticResults.map((item) => (
+              <div key={item.movie_id} className="card p-4 flex gap-4">
+                <img src={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : 'https://via.placeholder.com/150'} alt={item.title} className="w-24 aspect-[2/3] object-cover rounded-lg" />
+                <div>
+                  <h3 className="font-bold text-white text-lg">{item.title}</h3>
+                  <div className="text-xs text-[var(--color-accent)] font-semibold mt-1">Match: {item.match_percentage}%</div>
+                  <p className="text-xs text-gray-400 mt-2 line-clamp-3">{item.explanation}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : movies.length > 0 ? (
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 sm:gap-6">
+          {movies.map((movie) => (
+            <MovieCard key={movie.id} movie={movie} />
+          ))}
+        </div>
+      ) : (
+        <div className="text-center py-20 space-y-4">
+          <div className="text-5xl">🎬</div>
+          <h3 className="text-xl font-bold text-white font-['Outfit']">No Movies Found</h3>
+          <p className="text-gray-400 text-sm">Try adjusting your query or filter parameters.</p>
+        </div>
+      )}
+    </div>
+  );
+};

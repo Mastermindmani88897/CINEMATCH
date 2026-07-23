@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+venv/
+.venv/
+env/
+__pycache__/
+*.pyc
+
+# Builds & Outputs
+dist/
+build/
+.output/
+*.egg-info/
+
+# Environment & Secrets
+.env
+.env.local
+.env.production
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+cinematch.db
+
+# ML Model binaries (keep folder structure)
+ml/models/*.pkl
+ml/models/*.npy
+!ml/models/.gitkeep
