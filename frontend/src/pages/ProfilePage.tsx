@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useAuthStore } from '../store/authStore';
 import { recApi, userApi } from '../api/client';
-import { TasteAnalysis, Movie } from '../types';
+import type { TasteAnalysis, Movie } from '../types';
 import { MovieCard } from '../components/common/MovieCard';
-import { SparklesIcon, HeartIcon, BookmarkIcon, ClockIcon, ChartPieIcon } from '@heroicons/react/24/solid';
+import { HeartIcon, BookmarkIcon, ClockIcon, ChartPieIcon } from '@heroicons/react/24/solid';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts';
 
 const COLORS = ['#e50914', '#f5c518', '#3b82f6', '#10b981', '#8b5cf6', '#ec4899', '#f97316'];
@@ -15,11 +15,9 @@ export const ProfilePage: React.FC = () => {
   const [watchlist, setWatchlist] = useState<Movie[]>([]);
   const [history, setHistory] = useState<Movie[]>([]);
   const [activeTab, setActiveTab] = useState<'taste' | 'favorites' | 'watchlist' | 'history'>('taste');
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchUserData = async () => {
-      setLoading(true);
       try {
         const [t, f, w, h] = await Promise.all([
           recApi.getTasteAnalysis().catch(() => null),
@@ -31,9 +29,7 @@ export const ProfilePage: React.FC = () => {
         setFavorites(f);
         setWatchlist(w);
         setHistory(h);
-      } finally {
-        setLoading(false);
-      }
+      } catch {}
     };
     fetchUserData();
   }, []);
@@ -44,7 +40,6 @@ export const ProfilePage: React.FC = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-      {/* Header Profile Banner */}
       <div className="card p-6 sm:p-8 flex flex-col sm:flex-row items-center gap-6 border-[var(--color-primary)]/30">
         <div className="w-24 h-24 rounded-2xl bg-gradient-to-tr from-[var(--color-primary)] to-[var(--color-accent)] text-white font-extrabold text-3xl flex items-center justify-center shadow-xl">
           {user.avatar_url ? (
@@ -75,7 +70,6 @@ export const ProfilePage: React.FC = () => {
         )}
       </div>
 
-      {/* Tabs */}
       <div className="flex border-b border-[var(--color-border)] gap-6 text-sm font-semibold">
         {[
           { id: 'taste', label: 'AI Taste Analytics', icon: ChartPieIcon },
@@ -101,10 +95,8 @@ export const ProfilePage: React.FC = () => {
         })}
       </div>
 
-      {/* Tab Content */}
       {activeTab === 'taste' && taste && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {/* Recharts Genre Pie Chart */}
           <div className="card p-6 space-y-4">
             <h3 className="font-bold text-white text-lg font-['Outfit']">Favorite Genre Distribution</h3>
             <div className="h-64">
@@ -117,7 +109,7 @@ export const ProfilePage: React.FC = () => {
                     cx="50%"
                     cy="50%"
                     outerRadius={80}
-                    label={({ genre, percentage }) => `${genre} ${percentage}%`}
+                    label={(entry: any) => `${entry.genre} ${entry.percentage}%`}
                   >
                     {taste.favorite_genres.map((_, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -129,7 +121,6 @@ export const ProfilePage: React.FC = () => {
             </div>
           </div>
 
-          {/* Stats Summary */}
           <div className="card p-6 space-y-4">
             <h3 className="font-bold text-white text-lg font-['Outfit']">Taste Profile Metrics</h3>
             <div className="grid grid-cols-2 gap-4 text-center">

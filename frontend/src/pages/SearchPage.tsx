@@ -4,21 +4,18 @@ import { SearchBar } from '../components/common/SearchBar';
 import { MovieCard } from '../components/common/MovieCard';
 import { MovieGridSkeleton } from '../components/common/Skeleton';
 import { searchApi, recApi, movieApi } from '../api/client';
-import { Movie, RecommendationItem } from '../types';
+import type { Movie, RecommendationItem } from '../types';
 import { FunnelIcon, SparklesIcon } from '@heroicons/react/24/outline';
 
 export const SearchPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const initialQuery = searchParams.get('q') || '';
 
-  const [query, setQuery] = useState(initialQuery);
   const [isSemantic, setIsSemantic] = useState(false);
   const [movies, setMovies] = useState<Movie[]>([]);
   const [semanticResults, setSemanticResults] = useState<RecommendationItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [genres, setGenres] = useState<string[]>([]);
 
-  // Filter states
   const [selectedGenre, setSelectedGenre] = useState('');
   const [selectedYear, setSelectedYear] = useState('');
   const [minRating, setMinRating] = useState('0');
@@ -30,7 +27,6 @@ export const SearchPage: React.FC = () => {
 
   useEffect(() => {
     const q = searchParams.get('q') || '';
-    setQuery(q);
     executeSearch(q);
   }, [searchParams, selectedGenre, selectedYear, minRating, sortBy, isSemantic]);
 
@@ -69,7 +65,6 @@ export const SearchPage: React.FC = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-      {/* Search Header */}
       <div className="space-y-4 max-w-3xl mx-auto text-center">
         <h1 className="text-3xl sm:text-4xl font-extrabold text-white font-['Outfit']">
           Search & Discover
@@ -80,7 +75,6 @@ export const SearchPage: React.FC = () => {
           onSearchSubmit={handleSearchSubmit}
         />
 
-        {/* Semantic Toggle */}
         <div className="flex items-center justify-center gap-3 pt-2">
           <button
             type="button"
@@ -97,7 +91,6 @@ export const SearchPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Filter Bar */}
       <div className="card p-4 flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-2 text-sm font-semibold text-gray-300">
           <FunnelIcon className="w-5 h-5 text-[var(--color-primary-light)]" />
@@ -105,7 +98,6 @@ export const SearchPage: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          {/* Genre Filter */}
           <select
             value={selectedGenre}
             onChange={(e) => setSelectedGenre(e.target.value)}
@@ -117,7 +109,6 @@ export const SearchPage: React.FC = () => {
             ))}
           </select>
 
-          {/* Year Filter */}
           <select
             value={selectedYear}
             onChange={(e) => setSelectedYear(e.target.value)}
@@ -129,7 +120,6 @@ export const SearchPage: React.FC = () => {
             ))}
           </select>
 
-          {/* Rating Filter */}
           <select
             value={minRating}
             onChange={(e) => setMinRating(e.target.value)}
@@ -140,7 +130,6 @@ export const SearchPage: React.FC = () => {
             <option value="8">8.0+ Stars</option>
           </select>
 
-          {/* Sort By */}
           {!isSemantic && (
             <select
               value={sortBy}
@@ -155,7 +144,6 @@ export const SearchPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Results Grid */}
       {loading ? (
         <MovieGridSkeleton count={10} />
       ) : isSemantic && semanticResults.length > 0 ? (

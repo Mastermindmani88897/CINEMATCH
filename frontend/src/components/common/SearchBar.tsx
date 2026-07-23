@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MagnifyingGlassIcon, MicrophoneIcon, SparklesIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { searchApi } from '../../api/client';
-import { SearchSuggestion } from '../../types';
+import type { SearchSuggestion } from '../../types';
 import toast from 'react-hot-toast';
 
 interface SearchBarProps {
@@ -25,7 +25,6 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   const navigate = useNavigate();
   const wrapperRef = useRef<HTMLDivElement>(null);
 
-  // Autocomplete fetch
   useEffect(() => {
     if (query.trim().length < 2) {
       setSuggestions([]);
@@ -36,14 +35,11 @@ export const SearchBar: React.FC<SearchBarProps> = ({
         const res = await searchApi.getSuggestions(query);
         setSuggestions(res);
         setIsOpen(true);
-      } catch {
-        // silent fail
-      }
+      } catch {}
     }, 250);
     return () => clearTimeout(timer);
   }, [query]);
 
-  // Click outside listener
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
@@ -75,7 +71,6 @@ export const SearchBar: React.FC<SearchBarProps> = ({
     }
   };
 
-  // Browser Speech Recognition for Voice Search
   const handleVoiceSearch = () => {
     const SpeechRecognition =
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -144,7 +139,6 @@ export const SearchBar: React.FC<SearchBarProps> = ({
             </button>
           )}
 
-          {/* Voice Search Button */}
           <button
             type="button"
             onClick={handleVoiceSearch}
@@ -160,7 +154,6 @@ export const SearchBar: React.FC<SearchBarProps> = ({
         </div>
       </form>
 
-      {/* Autocomplete Dropdown */}
       {isOpen && suggestions.length > 0 && (
         <div className="absolute left-0 right-0 top-full mt-2 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl shadow-2xl overflow-hidden z-50 py-2">
           {suggestions.map((s, idx) => (

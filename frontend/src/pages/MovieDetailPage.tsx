@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { StarIcon, PlayIcon, HeartIcon, BookmarkIcon, SparklesIcon, AdjustmentsHorizontalIcon, PencilSquareIcon } from '@heroicons/react/24/solid';
 import { HeartIcon as HeartOutline, BookmarkIcon as BookmarkOutline } from '@heroicons/react/24/outline';
 import { movieApi, recApi, userApi } from '../api/client';
-import { Movie, RecommendationItem, ReviewResponse } from '../types';
+import type { Movie, RecommendationItem, ReviewResponse, NoteResponse } from '../types';
 import { MovieCard } from '../components/common/MovieCard';
 import { RatingWidget } from '../components/common/RatingWidget';
 import { useMovieStore } from '../store/movieStore';
@@ -37,15 +37,11 @@ export const MovieDetailPage: React.FC = () => {
         const data = await movieApi.getMovieById(movieId);
         setMovie(data);
 
-        // Fetch content recs
         recApi.getContentRecs(movieId, 10).then((r) => setRecommendations(r.recommendations)).catch(() => {});
-
-        // Fetch reviews
         userApi.getReviews(movieId).then(setReviews).catch(() => {});
 
-        // Fetch user note if authenticated
         if (isAuthenticated) {
-          userApi.getNote(movieId).then((n) => n && setUserNote(n.content)).catch(() => {});
+          userApi.getNote(movieId).then((n: NoteResponse | null) => n && setUserNote(n.content)).catch(() => {});
           userApi.logHistory(movieId).catch(() => {});
         }
       } catch (err) {
@@ -132,16 +128,13 @@ export const MovieDetailPage: React.FC = () => {
 
   return (
     <div className="space-y-12 pb-16">
-      {/* Backdrop Banner */}
       <div className="relative min-h-[60vh] flex items-end overflow-hidden border-b border-[var(--color-border)]">
         <img src={backdropUrl} alt={movie.title} className="absolute inset-0 w-full h-full object-cover filter brightness-[0.3]" />
         <div className="absolute inset-0 bg-gradient-to-t from-[var(--color-bg)] via-[var(--color-bg)]/70 to-transparent" />
 
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 w-full flex flex-col md:flex-row gap-8 items-end">
-          {/* Poster */}
           <img src={posterUrl} alt={movie.title} className="w-48 sm:w-64 aspect-[2/3] object-cover rounded-2xl shadow-2xl border border-white/10 shrink-0" />
 
-          {/* Details */}
           <div className="space-y-4 flex-1">
             <div className="flex flex-wrap items-center gap-3 text-xs text-gray-300">
               <span className="px-2.5 py-1 rounded-md bg-white/10 font-bold text-[var(--color-accent)] flex items-center gap-1">
@@ -155,14 +148,12 @@ export const MovieDetailPage: React.FC = () => {
             <h1 className="text-3xl sm:text-5xl font-black text-white font-['Outfit']">{movie.title}</h1>
             {movie.tagline && <p className="italic text-gray-400 text-sm sm:text-base">"{movie.tagline}"</p>}
 
-            {/* Genre Pills */}
             <div className="flex flex-wrap gap-2 pt-1">
               {movie.genres?.map((g) => (
                 <span key={g} className="genre-pill">{g}</span>
               ))}
             </div>
 
-            {/* Action buttons */}
             <div className="flex flex-wrap items-center gap-4 pt-4">
               {movie.trailer_key && (
                 <button onClick={() => openTrailer(movie.trailer_key!, movie.title)} className="btn-primary">
@@ -183,17 +174,13 @@ export const MovieDetailPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Main Body Grid */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 lg:grid-cols-3 gap-12">
-        {/* Left Column (2 cols) */}
         <div className="lg:col-span-2 space-y-10">
-          {/* Overview */}
           <section className="space-y-3">
             <h2 className="text-2xl font-bold text-white font-['Outfit']">Overview</h2>
             <p className="text-gray-300 leading-relaxed text-base">{movie.overview || 'No overview available.'}</p>
           </section>
 
-          {/* Cast Carousel */}
           {movie.cast && movie.cast.length > 0 && (
             <section className="space-y-4">
               <h2 className="text-2xl font-bold text-white font-['Outfit']">Top Cast</h2>
@@ -211,7 +198,6 @@ export const MovieDetailPage: React.FC = () => {
             </section>
           )}
 
-          {/* User Reviews */}
           <section className="space-y-6">
             <h2 className="text-2xl font-bold text-white font-['Outfit']">Reviews</h2>
             {isAuthenticated && (
@@ -244,9 +230,7 @@ export const MovieDetailPage: React.FC = () => {
           </section>
         </div>
 
-        {/* Right Sidebar (1 col) */}
         <div className="space-y-8">
-          {/* Rate & Note Card */}
           <div className="card p-6 space-y-4 border-[var(--color-primary)]/30">
             <h3 className="font-bold text-white text-lg font-['Outfit'] flex items-center gap-2">
               <PencilSquareIcon className="w-5 h-5 text-[var(--color-accent)]" /> Your Interactive Rating
@@ -268,7 +252,6 @@ export const MovieDetailPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Additional Info Table */}
           <div className="card p-6 space-y-3 text-sm">
             <h3 className="font-bold text-white font-['Outfit'] mb-2">Movie Metadata</h3>
             <div className="flex justify-between text-gray-400 py-1 border-b border-white/5">
@@ -280,21 +263,10 @@ export const MovieDetailPage: React.FC = () => {
             <div className="flex justify-between text-gray-400 py-1 border-b border-white/5">
               <span>Popularity Score:</span> <span className="text-white font-medium">{movie.popularity?.toFixed(1)}</span>
             </div>
-            {movie.budget ? (
-              <div className="flex justify-between text-gray-400 py-1 border-b border-white/5">
-                <span>Budget:</span> <span className="text-white font-medium">${(movie.budget / 1e6).toFixed(1)}M</span>
-              </div>
-            ) : null}
-            {movie.revenue ? (
-              <div className="flex justify-between text-gray-400 py-1 border-b border-white/5">
-                <span>Revenue:</span> <span className="text-white font-medium">${(movie.revenue / 1e6).toFixed(1)}M</span>
-              </div>
-            ) : null}
           </div>
         </div>
       </div>
 
-      {/* Recommended Similar Movies */}
       {recommendations.length > 0 && (
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6 pt-8 border-t border-[var(--color-border)]">
           <div className="flex items-center gap-3">

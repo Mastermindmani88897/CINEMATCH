@@ -14,6 +14,7 @@ from fastapi.exceptions import RequestValidationError
 
 from app.core.config import settings
 from app.core.database import init_db, close_db
+from app.core.validate import run_startup_validation
 from app.api import auth, movies, recommendations, search, users, analytics, admin
 from app.services.tmdb_sync import schedule_daily_sync
 
@@ -33,6 +34,9 @@ async def lifespan(app: FastAPI):
 
     # Connect to MongoDB Atlas & create indexes
     await init_db()
+
+    # Run Startup Validation
+    await run_startup_validation()
 
     # Load ML engines in background
     try:
@@ -103,21 +107,11 @@ app.include_router(analytics.router, prefix=PREFIX)
 app.include_router(admin.router, prefix=PREFIX)
 
 
-# ── Health Check ───────────────────────────────────────────────────────────
+# ── Health Endpoint ────────────────────────────────────────────────────────
 @app.get("/health", tags=["Health"])
 async def health_check():
-    try:
-        from ml.pipeline.hybrid_engine import hybrid_engine
-        ml_ready = hybrid_engine.is_ready()
-    except Exception:
-        ml_ready = False
-    return {
-        "status": "healthy",
-        "database": "MongoDB Atlas",
-        "environment": settings.ENVIRONMENT,
-        "ml_engine": "ready" if ml_ready else "not loaded",
-        "version": settings.APP_VERSION,
-    }
+    """Detailed health check reporting MongoDB, ML Engine, TMDB API, and Gemini API status."""
+    return await run_startup_validation()
 
 
 @app.get("/", tags=["Root"])

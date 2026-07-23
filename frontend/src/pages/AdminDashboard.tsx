@@ -9,10 +9,8 @@ export const AdminDashboard: React.FC = () => {
   const [genreDist, setGenreDist] = useState<any[]>([]);
   const [retrainStatus, setRetrainStatus] = useState<any>(null);
   const [users, setUsers] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
 
   const fetchAdminData = async () => {
-    setLoading(true);
     try {
       const [s, g, u] = await Promise.all([
         api.get('/analytics/dashboard').then((r) => r.data),
@@ -22,10 +20,8 @@ export const AdminDashboard: React.FC = () => {
       setStats(s);
       setGenreDist(g);
       setUsers(u);
-    } catch (err) {
+    } catch {
       toast.error('Failed to load admin data');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -62,7 +58,6 @@ export const AdminDashboard: React.FC = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-      {/* Title */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-3xl font-black text-white font-['Outfit'] flex items-center gap-2">
@@ -83,7 +78,6 @@ export const AdminDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* KPI Cards */}
       {stats && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="card p-5 space-y-2">
@@ -117,7 +111,6 @@ export const AdminDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Recharts Analytics */}
       <div className="card p-6 space-y-4">
         <h2 className="font-bold text-white text-lg font-['Outfit']">Database Genre Distribution</h2>
         <div className="h-64">
@@ -132,7 +125,6 @@ export const AdminDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* User Management Table */}
       <div className="card p-6 space-y-4 overflow-x-auto">
         <h2 className="font-bold text-white text-lg font-['Outfit']">User Account Management</h2>
         <table className="w-full text-left text-sm border-collapse">

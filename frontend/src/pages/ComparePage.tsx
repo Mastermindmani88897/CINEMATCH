@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { movieApi, recApi } from '../api/client';
-import { Movie } from '../types';
-import { StarIcon, AdjustmentsHorizontalIcon } from '@heroicons/react/24/solid';
+import type { Movie } from '../types';
+import { AdjustmentsHorizontalIcon } from '@heroicons/react/24/solid';
 
 export const ComparePage: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -12,12 +12,10 @@ export const ComparePage: React.FC = () => {
   const [movie1, setMovie1] = useState<Movie | null>(null);
   const [movie2, setMovie2] = useState<Movie | null>(null);
   const [similarityScore, setSimilarityScore] = useState<number | null>(null);
-  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     const fetchComparison = async () => {
       if (!m1Id) return;
-      setLoading(true);
       try {
         const m1 = await movieApi.getMovieById(parseInt(m1Id));
         setMovie1(m1);
@@ -26,7 +24,6 @@ export const ComparePage: React.FC = () => {
           const m2 = await movieApi.getMovieById(parseInt(m2Id));
           setMovie2(m2);
 
-          // Get similarity explanation
           try {
             const exp = await recApi.getExplanation(m1.id, m2.id);
             setSimilarityScore(exp.similarity_score);
@@ -34,8 +31,6 @@ export const ComparePage: React.FC = () => {
         }
       } catch (err) {
         console.error('Failed comparison fetch', err);
-      } finally {
-        setLoading(false);
       }
     };
     fetchComparison();
@@ -59,7 +54,6 @@ export const ComparePage: React.FC = () => {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        {/* Movie 1 */}
         {movie1 ? (
           <div className="card p-6 space-y-4">
             <img src={movie1.poster_path ? `https://image.tmdb.org/t/p/w500${movie1.poster_path}` : ''} alt={movie1.title} className="w-40 aspect-[2/3] object-cover rounded-xl mx-auto" />
@@ -87,7 +81,6 @@ export const ComparePage: React.FC = () => {
           <div className="card p-12 text-center text-gray-500">Select first movie to compare</div>
         )}
 
-        {/* Movie 2 */}
         {movie2 ? (
           <div className="card p-6 space-y-4">
             <img src={movie2.poster_path ? `https://image.tmdb.org/t/p/w500${movie2.poster_path}` : ''} alt={movie2.title} className="w-40 aspect-[2/3] object-cover rounded-xl mx-auto" />

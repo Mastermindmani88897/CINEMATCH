@@ -21,10 +21,13 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
 
-    # TMDB
+    # TMDB API
     TMDB_API_KEY: str = ""
     TMDB_BASE_URL: str = "https://api.themoviedb.org/3"
     TMDB_IMAGE_BASE_URL: str = "https://image.tmdb.org/t/p"
+
+    # Google Gemini AI API
+    GEMINI_API_KEY: str = ""
 
     # Cloudinary
     CLOUDINARY_CLOUD_NAME: str = ""

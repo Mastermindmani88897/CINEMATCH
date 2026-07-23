@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { StarIcon, SparklesIcon, InformationCircleIcon } from '@heroicons/react/24/solid';
-import { RecommendationItem } from '../../types';
+import type { RecommendationItem } from '../../types';
 
 interface RecommendationCardProps {
   item: RecommendationItem;

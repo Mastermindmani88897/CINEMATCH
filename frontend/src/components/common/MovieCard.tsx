@@ -2,7 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { StarIcon, PlayIcon, HeartIcon, BookmarkIcon } from '@heroicons/react/24/solid';
 import { HeartIcon as HeartOutline, BookmarkIcon as BookmarkOutline } from '@heroicons/react/24/outline';
-import { Movie } from '../../types';
+import type { Movie } from '../../types';
 import { useMovieStore } from '../../store/movieStore';
 import { useAuthStore } from '../../store/authStore';
 import { userApi } from '../../api/client';
@@ -40,7 +40,7 @@ export const MovieCard: React.FC<MovieCardProps> = ({ movie }) => {
         toast.success('Added to favorites');
       }
     } catch {
-      toggleFavoriteId(movie.id); // rollback
+      toggleFavoriteId(movie.id);
     }
   };
 
@@ -61,7 +61,7 @@ export const MovieCard: React.FC<MovieCardProps> = ({ movie }) => {
         toast.success('Added to watchlist');
       }
     } catch {
-      toggleWatchlistId(movie.id); // rollback
+      toggleWatchlistId(movie.id);
     }
   };
 
@@ -85,13 +85,11 @@ export const MovieCard: React.FC<MovieCardProps> = ({ movie }) => {
           loading="lazy"
         />
 
-        {/* Rating Pill */}
         <div className="absolute top-2 left-2 px-2 py-1 rounded-md bg-black/75 backdrop-blur-md flex items-center gap-1 text-xs font-bold text-[var(--color-accent)] border border-white/10">
           <StarIcon className="w-3.5 h-3.5" />
           {movie.vote_average ? movie.vote_average.toFixed(1) : 'N/A'}
         </div>
 
-        {/* Action Buttons */}
         <div className="absolute top-2 right-2 flex flex-col gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
           <button
             onClick={handleFavorite}
@@ -114,7 +112,6 @@ export const MovieCard: React.FC<MovieCardProps> = ({ movie }) => {
           </button>
         </div>
 
-        {/* Play Trailer Overlay */}
         {movie.trailer_key && (
           <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/40">
             <button
@@ -127,7 +124,6 @@ export const MovieCard: React.FC<MovieCardProps> = ({ movie }) => {
           </div>
         )}
 
-        {/* Overlay Info */}
         <div className="movie-card-overlay">
           <div className="text-xs font-medium text-gray-400 mb-1">
             {movie.release_year || 'Unknown Year'} {movie.runtime ? `• ${movie.runtime}m` : ''}

@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { SparklesIcon, FireIcon, HeartIcon, FilmIcon, UserIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { SparklesIcon, FireIcon, HeartIcon, FilmIcon, UserIcon } from '@heroicons/react/24/outline';
 import { recApi, movieApi } from '../api/client';
-import { RecommendationItem } from '../types';
+import type { RecommendationItem } from '../types';
 import { RecommendationCard } from '../components/common/RecommendationCard';
 import { RecommendationCardSkeleton } from '../components/common/Skeleton';
 import { useAuthStore } from '../store/authStore';
@@ -17,7 +17,7 @@ export const RecommendationPage: React.FC = () => {
   const [selectedMood, setSelectedMood] = useState(initialMood);
   const [selectedGenres, setSelectedGenres] = useState<string[]>(['Action']);
   const [semanticQuery, setSemanticQuery] = useState('emotional sci-fi space movies');
-  const [seedMovieId, setSeedMovieId] = useState<number>(1);
+  const seedMovieId = 1;
   const [results, setResults] = useState<RecommendationItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [allGenres, setAllGenres] = useState<string[]>([]);
@@ -63,7 +63,6 @@ export const RecommendationPage: React.FC = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-      {/* Header */}
       <div className="text-center max-w-3xl mx-auto space-y-3">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--color-primary)]/10 text-[var(--color-primary-light)] text-xs font-bold uppercase tracking-wider">
           <SparklesIcon className="w-4 h-4" /> Hybrid ML Recommender Engine
@@ -76,7 +75,6 @@ export const RecommendationPage: React.FC = () => {
         </p>
       </div>
 
-      {/* Tabs Bar */}
       <div className="flex flex-wrap items-center justify-center gap-2 border-b border-[var(--color-border)] pb-4">
         {[
           { id: 'mood', label: 'Mood Based', icon: HeartIcon },
@@ -103,7 +101,6 @@ export const RecommendationPage: React.FC = () => {
         })}
       </div>
 
-      {/* Controls based on active tab */}
       <div className="card p-6 max-w-4xl mx-auto">
         {activeTab === 'mood' && (
           <div className="space-y-4">
@@ -167,7 +164,6 @@ export const RecommendationPage: React.FC = () => {
         )}
       </div>
 
-      {/* Results List */}
       <div className="max-w-4xl mx-auto space-y-4">
         {loading ? (
           Array.from({ length: 5 }).map((_, i) => <RecommendationCardSkeleton key={i} />)

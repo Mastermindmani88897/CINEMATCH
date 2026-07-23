@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { SparklesIcon, FireIcon, TrophyIcon, CalendarIcon, HeartIcon, FilmIcon, PlayIcon } from '@heroicons/react/24/solid';
-import { movieApi, recApi } from '../api/client';
-import { Movie } from '../types';
+import { SparklesIcon, FireIcon, TrophyIcon, CalendarIcon, PlayIcon } from '@heroicons/react/24/solid';
+import { movieApi } from '../api/client';
+import type { Movie } from '../types';
 import { MovieCard } from '../components/common/MovieCard';
 import { MovieGridSkeleton } from '../components/common/Skeleton';
 import { SearchBar } from '../components/common/SearchBar';
@@ -21,7 +21,6 @@ export const HomePage: React.FC = () => {
   const [trending, setTrending] = useState<Movie[]>([]);
   const [topRated, setTopRated] = useState<Movie[]>([]);
   const [popular, setPopular] = useState<Movie[]>([]);
-  const [upcoming, setUpcoming] = useState<Movie[]>([]);
   const [loading, setLoading] = useState(true);
   const [heroMovie, setHeroMovie] = useState<Movie | null>(null);
 
@@ -32,16 +31,14 @@ export const HomePage: React.FC = () => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const [tr, top, pop, up] = await Promise.all([
+        const [tr, top, pop] = await Promise.all([
           movieApi.getTrending(10),
           movieApi.getTopRated(10),
           movieApi.getPopular(10),
-          movieApi.getUpcoming(10),
         ]);
         setTrending(tr);
         setTopRated(top);
         setPopular(pop);
-        setUpcoming(up);
         if (tr.length > 0) {
           setHeroMovie(tr[0]);
         }
@@ -60,16 +57,13 @@ export const HomePage: React.FC = () => {
 
   return (
     <div className="space-y-16 pb-16">
-      {/* Hero Section */}
       <div className="relative min-h-[80vh] flex items-center justify-center overflow-hidden rounded-3xl mx-4 sm:mx-8 border border-[var(--color-border)] shadow-2xl mt-4">
-        {/* Background Image & Overlay */}
         <div className="absolute inset-0 z-0">
           <img src={heroBackdrop} alt="Hero Backdrop" className="w-full h-full object-cover filter brightness-[0.4] scale-105 transition-transform duration-1000" />
           <div className="absolute inset-0 bg-gradient-to-t from-[var(--color-bg)] via-[var(--color-bg)]/60 to-transparent" />
           <div className="absolute inset-0 bg-gradient-to-r from-[var(--color-bg)] via-[var(--color-bg)]/40 to-transparent" />
         </div>
 
-        {/* Hero Content */}
         <div className="relative z-10 max-w-5xl mx-auto px-6 py-20 text-center space-y-8">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass border border-amber-500/30 text-amber-300 text-xs sm:text-sm font-semibold tracking-wide uppercase">
             <SparklesIcon className="w-4 h-4 text-amber-400 animate-spin" />
@@ -84,7 +78,6 @@ export const HomePage: React.FC = () => {
             Discover films tailored to your mood, taste profile, and natural language prompts using TF-IDF, Cosine Similarity & Sentence Transformers.
           </p>
 
-          {/* Search Bar in Hero */}
           <div className="max-w-2xl mx-auto pt-2">
             <SearchBar placeholder='Try searching "emotional space survival movies" or "Inception"...' />
           </div>
@@ -108,7 +101,6 @@ export const HomePage: React.FC = () => {
         </div>
       </div>
 
-      {/* Mood Selector Section */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
         <div className="flex items-center gap-3">
           <SparklesIcon className="w-6 h-6 text-[var(--color-accent)]" />
@@ -132,7 +124,6 @@ export const HomePage: React.FC = () => {
         </div>
       </section>
 
-      {/* Trending Movies */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -155,7 +146,6 @@ export const HomePage: React.FC = () => {
         )}
       </section>
 
-      {/* Top Rated Section */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -178,11 +168,10 @@ export const HomePage: React.FC = () => {
         )}
       </section>
 
-      {/* Popular & Upcoming Split */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
         <div className="flex items-center gap-3">
           <CalendarIcon className="w-6 h-6 text-blue-400" />
-          <h2 className="section-title mb-0">Popular & Recent Releases</h2>
+          <h2 className="section-title mb-0">Popular Movies</h2>
         </div>
 
         {loading ? (

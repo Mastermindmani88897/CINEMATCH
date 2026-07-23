@@ -1,6 +1,6 @@
 import axios from 'axios';
-import {
-  User, Movie, PaginatedResponse, RecommendationResponse,
+import type {
+  Movie, PaginatedResponse, RecommendationResponse,
   ExplanationResponse, TasteAnalysis, SearchSuggestion,
   RatingResponse, ReviewResponse, NoteResponse
 } from '../types';
