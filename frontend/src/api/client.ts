@@ -86,22 +86,30 @@ export const movieApi = {
     const { data } = await api.get<string[]>('/movies/genres');
     return data;
   },
+  getWatchProviders: async (movieId: number) => {
+    const { data } = await api.get<Record<string, any>>(`/movies/${movieId}/watch-providers`);
+    return data;
+  },
+  getTopRatedCatalog: async (params?: any) => {
+    const { data } = await api.get<PaginatedResponse<Movie>>('/movies/top-rated-catalog', { params });
+    return data;
+  },
 };
 
 export const recApi = {
-  getIndustryRecs: async (industry: string, limit = 20) => {
+  getIndustryRecs: async (industry: string, limit = 100) => {
     const { data } = await api.get<RecommendationResponse>(`/recommendations/industry/${industry}`, { params: { limit } });
     return data;
   },
-  getPopularRecs: async (mode = 'weighted', limit = 20) => {
+  getPopularRecs: async (mode = 'weighted', limit = 100) => {
     const { data } = await api.get<RecommendationResponse>('/recommendations/popular', { params: { mode, limit } });
     return data;
   },
-  getGenreRecs: async (genres: string, limit = 20) => {
+  getGenreRecs: async (genres: string, limit = 100) => {
     const { data } = await api.get<RecommendationResponse>('/recommendations/genre', { params: { genres, limit } });
     return data;
   },
-  getMoodRecs: async (mood: string, limit = 20) => {
+  getMoodRecs: async (mood: string, limit = 100) => {
     const { data } = await api.get<RecommendationResponse>(`/recommendations/mood/${mood}`, { params: { limit } });
     return data;
   },

@@ -48,6 +48,12 @@ export interface Movie {
   origin_country?: string;
   budget?: number;
   revenue?: number;
+  profit_loss?: number;
+  roi_percentage?: number;
+  recovery_percentage?: number;
+  collection_multiplier?: number;
+  box_office_status?: string;
+  watch_providers?: any;
   poster_path?: string;
   backdrop_path?: string;
   trailer_key?: string;

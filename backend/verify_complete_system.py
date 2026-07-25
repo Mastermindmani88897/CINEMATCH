@@ -168,6 +168,53 @@ async def run_full_verification():
         assert r_del_rev.status_code == 200, f"Deleting review failed: {r_del_rev.text}"
         print("  - Delete Review Endpoint Verified!")
 
+        # ── PHASE 13: Industry Diversity Audit ──────────────────────────────────
+        print("\n[PHASE 13 - INDUSTRY DIVERSITY AUDIT IN MOOD & GENRE RECS]")
+        for mood in ["happy", "action", "thriller"]:
+            r_mood = await client.get(f"/api/recommendations/mood/{mood}?limit=100")
+            assert r_mood.status_code == 200
+            mood_items = r_mood.json().get("recommendations", [])
+            assert len(mood_items) > 5, f"Mood '{mood}' returned too few results: {len(mood_items)}"
+            print(f"  - Mood '{mood}' returned {len(mood_items)} items.")
+
+        r_genre = await client.get("/api/recommendations/genre?genres=Action&limit=100")
+        assert r_genre.status_code == 200
+        genre_items = r_genre.json().get("recommendations", [])
+        assert len(genre_items) > 5, f"Genre 'Action' returned too few results: {len(genre_items)}"
+        print(f"  - Genre 'Action' returned {len(genre_items)} items.")
+
+        # ── PHASE 14: Financial Calculation Audit ────────────────────────────────
+        print("\n[PHASE 14 - FINANCIAL CALCULATION AUDIT]")
+        r_movie14 = await client.get("/api/movies/77")
+        assert r_movie14.status_code == 200
+        m_data = r_movie14.json()
+        budget = m_data.get("budget", 0)
+        revenue = m_data.get("revenue", 0)
+        if budget and budget > 0 and revenue and revenue > 0:
+            actual_pl = m_data.get("profit_loss")
+            assert actual_pl is not None, "profit_loss field missing from movie response"
+            print(f"  - Financial Audit: Budget={budget}, Revenue={revenue}, Profit/Loss={actual_pl}")
+            roi = m_data.get("roi_percentage")
+            assert roi is not None, "roi_percentage field missing"
+            status = m_data.get("box_office_status")
+            assert status, "box_office_status field missing"
+            print(f"  - ROI={roi}%, Status={status}")
+        else:
+            print(f"  - Movie 77 has no budget/revenue data — skipping financial assertion.")
+
+        # ── PHASE 15: Top Rated Catalog ──────────────────────────────────────────
+        print("\n[PHASE 15 - TOP RATED CATALOG AUDIT]")
+        r_top = await client.get("/api/movies/top-rated-catalog?preset=top_250&per_page=20&page=1&min_votes=10")
+        assert r_top.status_code == 200, f"Top rated catalog failed: {r_top.text}"
+        top_data = r_top.json()
+        assert top_data["total"] > 0, "Top rated catalog returned 0 movies"
+        print(f"  - Top Rated Catalog (Top 250): Total={top_data['total']}, Pages={top_data['pages']}, Items={len(top_data['items'])}")
+
+        r_top_tolly = await client.get("/api/movies/top-rated-catalog?preset=all_time&industry=tollywood&per_page=20&page=1")
+        assert r_top_tolly.status_code == 200
+        tolly_data = r_top_tolly.json()
+        print(f"  - Top Rated Tollywood: Total={tolly_data['total']}, Items={len(tolly_data['items'])}")
+
     print("\n" + "=" * 70)
     print("      ALL PHASES & ADVANCED SYSTEM AUDITS PASSED 100%")
     print("=" * 70)

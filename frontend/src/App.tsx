@@ -18,6 +18,7 @@ import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import { AdminDashboard } from './pages/AdminDashboard';
 import { ComparePage } from './pages/ComparePage';
+import { TopRatedPage } from './pages/TopRatedPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 
 import { useAuthStore } from './store/authStore';
@@ -58,6 +59,7 @@ export const App: React.FC = () => {
               <Route path="/forgot-password" element={<ForgotPasswordPage />} />
               <Route path="/reset-password" element={<ResetPasswordPage />} />
               <Route path="/admin" element={<AdminDashboard />} />
+              <Route path="/top-rated" element={<TopRatedPage />} />
               <Route path="/compare" element={<ComparePage />} />
               <Route path="*" element={<NotFoundPage />} />
             </Routes>

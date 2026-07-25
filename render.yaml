@@ -2,8 +2,9 @@ services:
   - type: web
     name: cinematch-backend
     env: python
-    buildCommand: pip install -r requirements.txt && python -m ml.train --skip-semantic
-    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: PYTHONPATH=/opt/render/project/src uvicorn app.main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: ENVIRONMENT
         value: production
@@ -13,3 +14,5 @@ services:
         sync: false  # Paste your MongoDB Atlas connection string in Render dashboard
       - key: SECRET_KEY
         generateValue: true
+      - key: PYTHONPATH
+        value: /opt/render/project/src

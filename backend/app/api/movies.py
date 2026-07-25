@@ -73,6 +73,41 @@ def map_tmdb_to_list_response(item: dict) -> dict:
     }
 
 
+def compute_financials(budget: float, revenue: float) -> dict:
+    if not budget or budget <= 0:
+        return {
+            "profit_loss": None,
+            "roi_percentage": None,
+            "recovery_percentage": None,
+            "collection_multiplier": None,
+            "box_office_status": None
+        }
+
+    profit = revenue - budget
+    roi = (profit / budget) * 100
+    recovery = (revenue / budget) * 100
+    multiplier = round(revenue / budget, 2)
+
+    if revenue >= 2.5 * budget:
+        status = "Blockbuster"
+    elif revenue >= 1.5 * budget:
+        status = "Super Hit"
+    elif revenue >= budget:
+        status = "Profitable / Hit"
+    elif revenue >= 0.8 * budget:
+        status = "Average / Break Even"
+    else:
+        status = "Box Office Failure"
+
+    return {
+        "profit_loss": round(profit, 2),
+        "roi_percentage": round(roi, 1),
+        "recovery_percentage": round(recovery, 1),
+        "collection_multiplier": multiplier,
+        "box_office_status": status
+    }
+
+
 def map_tmdb_to_detail_response(item: dict) -> dict:
     base = map_tmdb_to_list_response(item)
 
@@ -80,7 +115,6 @@ def map_tmdb_to_detail_response(item: dict) -> dict:
     raw_cast = credits.get("cast") or item.get("cast") or []
     raw_crew = credits.get("crew") or item.get("crew") or []
 
-    # Clean & format cast
     cast_list = []
     for c in raw_cast[:20]:
         if isinstance(c, dict):
@@ -91,7 +125,6 @@ def map_tmdb_to_detail_response(item: dict) -> dict:
                 "order": c.get("order", 0)
             })
 
-    # Clean & format crew
     crew_list = []
     directors = []
     writers = []
@@ -133,7 +166,6 @@ def map_tmdb_to_detail_response(item: dict) -> dict:
             if job in ("Director of Photography", "Cinematography") and name not in cinematography:
                 cinematography.append(name)
 
-    # Keywords
     kw_raw = item.get("keywords")
     keywords = []
     if isinstance(kw_raw, dict):
@@ -142,7 +174,6 @@ def map_tmdb_to_detail_response(item: dict) -> dict:
     elif isinstance(kw_raw, list):
         keywords = [k.get("name") if isinstance(k, dict) else str(k) for k in kw_raw]
 
-    # Videos / Trailer Key
     videos_raw = item.get("videos")
     trailer_key = item.get("trailer_key")
     if not trailer_key and isinstance(videos_raw, dict):
@@ -152,12 +183,15 @@ def map_tmdb_to_detail_response(item: dict) -> dict:
                 trailer_key = v.get("key")
                 break
 
-    # Spoken Languages
     spoken_languages = [
         l.get("english_name", l.get("name"))
         for l in item.get("spoken_languages", [])
         if isinstance(l, dict)
     ]
+
+    budget = float(item.get("budget") or 0)
+    revenue = float(item.get("revenue") or 0)
+    fin = compute_financials(budget, revenue)
 
     base.update({
         "tagline": str(item.get("tagline") or ""),
@@ -183,8 +217,14 @@ def map_tmdb_to_detail_response(item: dict) -> dict:
         "streaming_providers": ["Netflix", "Amazon Prime Video", "Disney+"],
         "trailer_key": trailer_key,
         "imdb_id": item.get("imdb_id"),
-        "budget": float(item.get("budget") or 0),
-        "revenue": float(item.get("revenue") or 0),
+        "budget": budget,
+        "revenue": revenue,
+        "profit_loss": fin["profit_loss"],
+        "roi_percentage": fin["roi_percentage"],
+        "recovery_percentage": fin["recovery_percentage"],
+        "collection_multiplier": fin["collection_multiplier"],
+        "box_office_status": fin["box_office_status"],
+        "watch_providers": item.get("watch_providers"),
         "trending_score": float(item.get("popularity") or 0.0),
         "created_at": datetime.now(),
     })
@@ -348,6 +388,79 @@ async def get_top_rated(
     return [MovieListResponse.model_validate(map_tmdb_to_list_response(m)) for m in results[:limit]]
 
 
+@router.get("/top-rated-catalog", response_model=PaginatedMovies)
+async def top_rated_catalog(
+    page: int = Query(1, ge=1),
+    per_page: int = Query(20, ge=1, le=100),
+    industry: Optional[str] = None,
+    language: Optional[str] = None,
+    year: Optional[int] = None,
+    genre: Optional[str] = None,
+    country: Optional[str] = None,
+    preset: Optional[str] = Query("all_time", pattern="^(top_100|top_250|top_500|top_1000|all_time)$"),
+    min_rating: float = Query(0, ge=0, le=10),
+    min_votes: int = Query(10, ge=0),
+):
+    db = get_database()
+    query = {"vote_count": {"$gte": min_votes}}
+
+    target_ind = (industry or language or "").lower().strip()
+    if target_ind in INDUSTRY_LANG_MAP:
+        query["original_language"] = INDUSTRY_LANG_MAP[target_ind]
+    elif language and language.lower().strip() in INDUSTRY_LANG_MAP:
+        query["original_language"] = INDUSTRY_LANG_MAP[language.lower().strip()]
+    elif language:
+        query["original_language"] = language
+
+    if year:
+        query["release_year"] = year
+    if genre:
+        query["genres"] = genre
+    if country:
+        query["origin_country"] = country
+    if min_rating > 0:
+        query["vote_average"] = {"$gte": min_rating}
+
+    limit_cap = 100000
+    if preset == "top_100":
+        limit_cap = 100
+    elif preset == "top_250":
+        limit_cap = 250
+    elif preset == "top_500":
+        limit_cap = 500
+    elif preset == "top_1000":
+        limit_cap = 1000
+
+    total_matched = await db.movies.count_documents(query)
+    effective_total = min(total_matched, limit_cap)
+
+    cursor = (
+        db.movies.find(query)
+        .sort("weighted_rating", -1)
+        .skip((page - 1) * per_page)
+        .limit(min(per_page, max(0, effective_total - (page - 1) * per_page)))
+    )
+    movies = [serialize_doc(m) async for m in cursor]
+
+    return PaginatedMovies(
+        items=[MovieListResponse.model_validate(m) for m in movies],
+        total=effective_total,
+        page=page,
+        per_page=per_page,
+        pages=max(1, (effective_total + per_page - 1) // per_page),
+    )
+
+
+@router.get("/{movie_id}/watch-providers")
+async def get_watch_providers(movie_id: int):
+    try:
+        data = await tmdb_service.get_movie_watch_providers(movie_id)
+        return data.get("results", {})
+    except Exception as e:
+        logger.warning(f"Failed to fetch watch providers for {movie_id}: {e}")
+        return {}
+
+
 @router.get("/genres", response_model=List[str])
 async def get_genres():
     try:
@@ -405,7 +518,13 @@ async def get_movie(movie_id: int):
             logger.warning(f"Could not live-enrich movie {movie_id} from TMDB: {e}")
 
     if movie:
-        return MovieResponse.model_validate(serialize_doc(movie))
+        doc = serialize_doc(movie)
+        # Compute financial metrics on-the-fly from stored budget/revenue
+        budget_val = float(doc.get("budget") or 0)
+        revenue_val = float(doc.get("revenue") or 0)
+        fin = compute_financials(budget_val, revenue_val)
+        doc.update(fin)
+        return MovieResponse.model_validate(doc)
 
     try:
         tmdb_data = await tmdb_service.get_movie_details(movie_id)

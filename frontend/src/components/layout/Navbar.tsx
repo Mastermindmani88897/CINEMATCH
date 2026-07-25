@@ -10,6 +10,7 @@ import {
   ArrowRightOnRectangleIcon,
   AdjustmentsHorizontalIcon,
   ChartBarIcon,
+  TrophyIcon,
 } from '@heroicons/react/24/outline';
 import { useAuthStore } from '../../store/authStore';
 import { useThemeStore } from '../../store/themeStore';
@@ -71,6 +72,15 @@ export const Navbar: React.FC = () => {
           >
             <AdjustmentsHorizontalIcon className="w-4 h-4" />
             Compare
+          </Link>
+          <Link
+            to="/top-rated"
+            className={`flex items-center gap-1 font-medium transition-colors hover:text-amber-400 ${
+              isActive('/top-rated') ? 'text-amber-400 font-semibold' : 'text-[var(--color-text-muted)]'
+            }`}
+          >
+            <TrophyIcon className="w-4 h-4" />
+            Top Rated
           </Link>
           {user?.is_admin && (
             <Link

@@ -26,8 +26,23 @@ export const MovieDetailPage: React.FC = () => {
   const [editingReviewId, setEditingReviewId] = useState<number | null>(null);
   const [editReviewContent, setEditReviewContent] = useState('');
   const [showFullCrew, setShowFullCrew] = useState(false);
+  const [watchProviders, setWatchProviders] = useState<Record<string, any>>({});
+  const [selectedRegion, setSelectedRegion] = useState<string>('US');
   const [loading, setLoading] = useState(true);
   const [isError, setIsError] = useState(false);
+
+  useEffect(() => {
+    if (!movieId) return;
+    movieApi.getWatchProviders(movieId).then((data) => {
+      if (data && typeof data === 'object') {
+        setWatchProviders(data);
+        const available = Object.keys(data);
+        if (available.length > 0 && !data['US']) {
+          setSelectedRegion(available.includes('IN') ? 'IN' : available[0]);
+        }
+      }
+    }).catch(() => {});
+  }, [movieId]);
 
   const { openTrailer, favoriteIds, watchlistIds, toggleFavoriteId, toggleWatchlistId } = useMovieStore();
   const { user, isAuthenticated } = useAuthStore();
@@ -464,25 +479,103 @@ export const MovieDetailPage: React.FC = () => {
               </span>
             </div>
 
-            <div className="flex justify-between py-1.5 border-b border-[var(--color-border)]">
-              <span className="font-semibold text-[var(--color-text-dim)]">Budget:</span>
-              <span className="text-[var(--color-text)] font-semibold">{formatCurrency(movie.budget)}</span>
-            </div>
+            {/* Financial Analytics */}
+            {movie.budget && movie.budget > 0 ? (
+              <div className="pt-3 border-t border-[var(--color-border)] space-y-2">
+                <div className="font-bold text-xs uppercase tracking-wider text-[var(--color-primary-light)]">Box Office & Financials</div>
+                
+                <div className="flex justify-between py-1 border-b border-[var(--color-border)]">
+                  <span className="font-semibold text-[var(--color-text-dim)]">Budget:</span>
+                  <span className="text-[var(--color-text)] font-semibold">{formatCurrency(movie.budget)}</span>
+                </div>
 
-            <div className="flex justify-between py-1.5 border-b border-[var(--color-border)]">
-              <span className="font-semibold text-[var(--color-text-dim)]">Box Office Revenue:</span>
-              <span className="text-emerald-500 font-semibold">{formatCurrency(movie.revenue)}</span>
-            </div>
+                <div className="flex justify-between py-1 border-b border-[var(--color-border)]">
+                  <span className="font-semibold text-[var(--color-text-dim)]">Worldwide Revenue:</span>
+                  <span className="text-emerald-500 font-semibold">{formatCurrency(movie.revenue)}</span>
+                </div>
 
-            <div className="flex justify-between py-1.5 border-b border-[var(--color-border)]">
-              <span className="font-semibold text-[var(--color-text-dim)]">Spoken Languages:</span>
-              <span className="text-[var(--color-text)] font-medium">{movie.spoken_languages?.join(', ') || 'English'}</span>
-            </div>
+                {movie.profit_loss !== undefined && movie.profit_loss !== null && (
+                  <div className="flex justify-between py-1 border-b border-[var(--color-border)]">
+                    <span className="font-semibold text-[var(--color-text-dim)]">{movie.profit_loss >= 0 ? 'Profit:' : 'Loss:'}</span>
+                    <span className={`font-bold ${movie.profit_loss >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                      {movie.profit_loss >= 0 ? `+${formatCurrency(movie.profit_loss)}` : `-${formatCurrency(Math.abs(movie.profit_loss))}`}
+                    </span>
+                  </div>
+                )}
 
-            <div className="flex justify-between py-1.5 border-b border-[var(--color-border)]">
-              <span className="font-semibold text-[var(--color-text-dim)]">Streaming Providers:</span>
-              <span className="text-[var(--color-accent)] font-semibold">Available to Stream</span>
-            </div>
+                {movie.roi_percentage !== undefined && movie.roi_percentage !== null && (
+                  <div className="flex justify-between py-1 border-b border-[var(--color-border)]">
+                    <span className="font-semibold text-[var(--color-text-dim)]">ROI %:</span>
+                    <span className={`font-bold ${movie.roi_percentage >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                      {movie.roi_percentage}%
+                    </span>
+                  </div>
+                )}
+
+                {movie.box_office_status && (
+                  <div className="flex justify-between py-1 border-b border-[var(--color-border)]">
+                    <span className="font-semibold text-[var(--color-text-dim)]">Box Office Status:</span>
+                    <span className={`font-bold px-2 py-0.5 rounded text-[10px] uppercase ${
+                      movie.box_office_status.includes('Blockbuster') || movie.box_office_status.includes('Hit')
+                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
+                        : 'bg-rose-500/20 text-rose-400 border border-rose-500/40'
+                    }`}>
+                      {movie.box_office_status}
+                    </span>
+                  </div>
+                )}
+              </div>
+            ) : null}
+
+            {/* TMDB Watch Providers */}
+            {Object.keys(watchProviders).length > 0 && (
+              <div className="pt-3 border-t border-[var(--color-border)] space-y-3">
+                <div className="flex justify-between items-center">
+                  <div className="font-bold text-xs uppercase tracking-wider text-[var(--color-accent)]">Where to Watch</div>
+                  <select
+                    value={selectedRegion}
+                    onChange={(e) => setSelectedRegion(e.target.value)}
+                    className="input text-[11px] py-1 px-2 w-auto bg-[var(--color-surface-2)]"
+                  >
+                    {Object.keys(watchProviders).map((r) => (
+                      <option key={r} value={r}>{r}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {watchProviders[selectedRegion]?.flatrate ? (
+                  <div className="space-y-1.5">
+                    <span className="text-[11px] font-semibold text-[var(--color-text-muted)] block">Stream:</span>
+                    <div className="flex flex-wrap gap-2">
+                      {watchProviders[selectedRegion].flatrate.map((p: any) => (
+                        <div key={p.provider_id} className="flex items-center gap-1.5 bg-[var(--color-surface-2)] px-2 py-1 rounded-lg border border-[var(--color-border)]">
+                          {p.logo_path && (
+                            <img src={`https://image.tmdb.org/t/p/w92${p.logo_path}`} alt={p.provider_name} className="w-5 h-5 rounded object-cover" />
+                          )}
+                          <span className="text-[11px] font-medium text-[var(--color-text)]">{p.provider_name}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : watchProviders[selectedRegion]?.buy || watchProviders[selectedRegion]?.rent ? (
+                  <div className="space-y-1.5">
+                    <span className="text-[11px] font-semibold text-[var(--color-text-muted)] block">Rent / Buy:</span>
+                    <div className="flex flex-wrap gap-2">
+                      {(watchProviders[selectedRegion].buy || watchProviders[selectedRegion].rent || []).slice(0, 4).map((p: any) => (
+                        <div key={p.provider_id} className="flex items-center gap-1.5 bg-[var(--color-surface-2)] px-2 py-1 rounded-lg border border-[var(--color-border)]">
+                          {p.logo_path && (
+                            <img src={`https://image.tmdb.org/t/p/w92${p.logo_path}`} alt={p.provider_name} className="w-5 h-5 rounded object-cover" />
+                          )}
+                          <span className="text-[11px] font-medium text-[var(--color-text)]">{p.provider_name}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-[11px] text-[var(--color-text-dim)] italic">No streaming provider info for {selectedRegion}.</p>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>

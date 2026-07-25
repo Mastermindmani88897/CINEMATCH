@@ -141,8 +141,61 @@ def format_recs(recs: list, algorithm: str) -> RecommendationResponse:
     return RecommendationResponse(recommendations=items, algorithm=algorithm, total=len(items))
 
 
-from ml.pipeline.explanation_engine import ExplanationGenerator
+def interleave_by_industry(candidates: list, max_per_lang_ratio: float = 0.35, target_limit: int = 100) -> list:
+    """
+    Re-ranks candidates to eliminate Hollywood / single-language bias.
+    Interleaves candidates from different original languages so recommendations contain global diversity.
+    """
+    if not candidates:
+        return []
 
+    # Group candidates by original_language
+    lang_groups = {}
+    for m in candidates:
+        lang = str(m.get("original_language", "en")).lower()
+        if lang not in lang_groups:
+            lang_groups[lang] = []
+        lang_groups[lang].append(m)
+
+    result = []
+    seen_ids = set()
+    max_single_lang = max(1, int(target_limit * max_per_lang_ratio))
+    lang_counts = {lang: 0 for lang in lang_groups}
+
+    active_langs = list(lang_groups.keys())
+
+    # First pass: Interleave while adhering to max_single_lang constraint
+    while active_langs and len(result) < target_limit:
+        next_active = []
+        for lang in active_langs:
+            group = lang_groups[lang]
+            if group and lang_counts[lang] < max_single_lang:
+                m = group.pop(0)
+                mid = m.get("id", m.get("tmdb_id"))
+                if mid not in seen_ids:
+                    seen_ids.add(mid)
+                    result.append(m)
+                    lang_counts[lang] += 1
+            if group and lang_counts[lang] < max_single_lang:
+                next_active.append(lang)
+        if len(next_active) == len(active_langs):
+            break
+        active_langs = next_active
+
+    # Second pass: Fill remaining slots if any left
+    if len(result) < target_limit:
+        for m in candidates:
+            mid = m.get("id", m.get("tmdb_id"))
+            if mid not in seen_ids:
+                seen_ids.add(mid)
+                result.append(m)
+            if len(result) >= target_limit:
+                break
+
+    return result
+
+
+from ml.pipeline.explanation_engine import ExplanationGenerator
 explainer = ExplanationGenerator()
 
 
@@ -158,7 +211,7 @@ async def industry_based(
 
     query = INDUSTRY_MAP.get(ind_lower, {"original_language": ind_lower[:2]})
 
-    # Fetch top candidate pool from database
+    # Fetch top candidate pool from database for explicit industry
     cursor = db.movies.find(query).sort("popularity", -1).limit(100)
     candidates = [m async for m in cursor]
 
@@ -190,7 +243,7 @@ async def industry_based(
     return format_recs(recs, f"industry-{ind_lower}")
 
 
-# ── 2. Mood-Based Recommendations ──────────────────────────────────────────
+# ── 2. Mood-Based Recommendations (Global Multi-Industry) ────────────────────
 @router.get("/mood/{mood}", response_model=RecommendationResponse)
 async def mood_based(
     mood: str,
@@ -213,11 +266,11 @@ async def mood_based(
     if config.get("exclude_genres"):
         query["genres"]["$nin"] = config["exclude_genres"]
 
-    cursor = db.movies.find(query).sort("popularity", -1).limit(150)
+    cursor = db.movies.find(query).sort("vote_average", -1).limit(300)
     candidates = [m async for m in cursor]
 
     if not candidates:
-        cursor = db.movies.find({"genres": {"$in": config["include_genres"]}}).sort("vote_average", -1).limit(50)
+        cursor = db.movies.find({"genres": {"$in": config["include_genres"]}}).sort("vote_average", -1).limit(100)
         candidates = [m async for m in cursor]
 
     scored = []
@@ -230,7 +283,10 @@ async def mood_based(
         scored.append((score, m))
 
     scored.sort(key=lambda x: x[0], reverse=True)
-    top_candidates = [m for _, m in scored[:limit]]
+    all_sorted = [m for _, m in scored]
+
+    # Apply global industry diversity interleaver
+    top_candidates = interleave_by_industry(all_sorted, max_per_lang_ratio=0.35, target_limit=limit)
 
     for m in top_candidates:
         m_dict = {
@@ -254,7 +310,7 @@ async def mood_based(
     return format_recs(recs, f"mood-{mood_key}")
 
 
-# ── 3. Genre-Based Recommendations ─────────────────────────────────────────
+# ── 3. Genre-Based Recommendations (Global Multi-Industry) ───────────────────
 @router.get("/genre", response_model=RecommendationResponse)
 async def genre_based(
     genres: str = Query(..., description="Comma-separated genres"),
@@ -264,15 +320,16 @@ async def genre_based(
     recs = []
     db = get_database()
 
-    # If multiple genres passed, find movies matching all ($all) or at least any ($in)
-    cursor = db.movies.find({"genres": {"$all": genre_list}} if len(genre_list) > 1 else {"genres": {"$in": genre_list}}).sort("popularity", -1).limit(limit)
+    cursor = db.movies.find({"genres": {"$all": genre_list}} if len(genre_list) > 1 else {"genres": {"$in": genre_list}}).sort("vote_average", -1).limit(300)
     candidates = [m async for m in cursor]
 
     if not candidates and len(genre_list) > 1:
-        cursor = db.movies.find({"genres": {"$in": genre_list}}).sort("popularity", -1).limit(limit)
+        cursor = db.movies.find({"genres": {"$in": genre_list}}).sort("vote_average", -1).limit(300)
         candidates = [m async for m in cursor]
 
-    for m in candidates:
+    top_candidates = interleave_by_industry(candidates, max_per_lang_ratio=0.35, target_limit=limit)
+
+    for m in top_candidates:
         m_dict = {
             "title": m.get("title", ""),
             "genres": m.get("genres", []),
@@ -294,7 +351,7 @@ async def genre_based(
     return format_recs(recs, "genre-based")
 
 
-# ── 4. Popularity-Based Recommendations ────────────────────────────────────
+# ── 4. Popularity-Based Recommendations (Global Multi-Industry) ──────────────
 @router.get("/popular", response_model=RecommendationResponse)
 async def popularity_based(
     limit: int = Query(20, ge=1, le=100),
@@ -304,8 +361,11 @@ async def popularity_based(
     recs = []
     sort_field = "trending_score" if mode == "trending" else ("popularity" if mode == "popular" else "weighted_rating")
 
-    cursor = db.movies.find({}).sort(sort_field, -1).limit(limit)
-    async for m in cursor:
+    cursor = db.movies.find({}).sort(sort_field, -1).limit(300)
+    candidates = [m async for m in cursor]
+    top_candidates = interleave_by_industry(candidates, max_per_lang_ratio=0.35, target_limit=limit)
+
+    for m in top_candidates:
         m_dict = {
             "title": m.get("title", ""),
             "genres": m.get("genres", []),
@@ -327,7 +387,7 @@ async def popularity_based(
     return format_recs(recs, f"popularity-{mode}")
 
 
-# ── 5. Semantic Search Recommendations ──────────────────────────────────────
+# ── 5. Semantic Search Recommendations (Global Multi-Industry) ───────────────
 @router.post("/semantic", response_model=RecommendationResponse)
 async def semantic_search(request: SemanticSearchRequest):
     recs = []
@@ -342,9 +402,12 @@ async def semantic_search(request: SemanticSearchRequest):
             {"keywords": {"$regex": q_clean, "$options": "i"}},
             {"tagline": {"$regex": q_clean, "$options": "i"}},
         ]
-    }).sort("popularity", -1).limit(request.limit)
+    }).sort("vote_average", -1).limit(200)
 
-    async for m in cursor:
+    candidates = [m async for m in cursor]
+    top_candidates = interleave_by_industry(candidates, max_per_lang_ratio=0.35, target_limit=request.limit)
+
+    for m in top_candidates:
         recs.append({
             "movie_id": m.get("id", m.get("tmdb_id")),
             "title": m.get("title", ""),

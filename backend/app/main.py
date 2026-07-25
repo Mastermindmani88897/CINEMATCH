@@ -4,9 +4,13 @@ CineMatch AI — FastAPI Application Entry Point (MongoDB Atlas Engine)
 
 import sys
 from pathlib import Path
-root_dir = Path(__file__).resolve().parent.parent.parent
-if str(root_dir) not in sys.path:
-    sys.path.insert(0, str(root_dir))
+# backend/app/main.py -> parent = backend/app, parent.parent = backend/
+# project root (where ml/ lives) = backend/../ = parent.parent.parent
+_backend_dir = Path(__file__).resolve().parent.parent          # e.g. /opt/render/project/src/backend
+_project_root = _backend_dir.parent                            # e.g. /opt/render/project/src  (where ml/ lives)
+for _p in [str(_project_root), str(_backend_dir)]:
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
 
 from contextlib import asynccontextmanager
 import logging

@@ -89,6 +89,12 @@ class MovieResponse(MovieBase):
     imdb_id: Optional[str] = None
     budget: Optional[float] = None
     revenue: Optional[float] = None
+    profit_loss: Optional[float] = None
+    roi_percentage: Optional[float] = None
+    recovery_percentage: Optional[float] = None
+    collection_multiplier: Optional[float] = None
+    box_office_status: Optional[str] = None
+    watch_providers: Optional[Any] = None
     weighted_rating: float = 0.0
     trending_score: float = 0.0
     created_at: Optional[datetime] = None
