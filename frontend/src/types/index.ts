@@ -100,6 +100,8 @@ export interface RecommendationResponse {
   recommendations: RecommendationItem[];
   algorithm: string;
   total: number;
+  page?: number;
+  pages?: number;
 }
 
 export interface ExplanationResponse {

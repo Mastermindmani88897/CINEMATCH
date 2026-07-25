@@ -117,7 +117,7 @@ MOOD_CONFIG = {
 }
 
 
-def format_recs(recs: list, algorithm: str) -> RecommendationResponse:
+def format_recs(recs: list, algorithm: str, total: Optional[int] = None, page: int = 1, pages: int = 1) -> RecommendationResponse:
     items = []
     seen = set()
     for r in recs:
@@ -138,7 +138,8 @@ def format_recs(recs: list, algorithm: str) -> RecommendationResponse:
                 explanation=r.get("explanation"),
             )
         )
-    return RecommendationResponse(recommendations=items, algorithm=algorithm, total=len(items))
+    tot = total if total is not None else len(items)
+    return RecommendationResponse(recommendations=items, algorithm=algorithm, total=tot, page=page, pages=pages)
 
 
 def interleave_by_industry(candidates: list, max_per_lang_ratio: float = 0.35, target_limit: int = 100) -> list:
@@ -203,25 +204,29 @@ explainer = ExplanationGenerator()
 @router.get("/industry/{industry}", response_model=RecommendationResponse)
 async def industry_based(
     industry: str,
-    limit: int = Query(20, ge=1, le=100),
+    page: int = Query(1, ge=1),
+    per_page: int = Query(24, ge=1, le=100),
+    limit: Optional[int] = Query(None, ge=1, le=1000),
 ):
     ind_lower = industry.lower().strip()
     db = get_database()
     recs = []
 
     query = INDUSTRY_MAP.get(ind_lower, {"original_language": ind_lower[:2]})
+    total_count = await db.movies.count_documents(query)
 
-    # Fetch top candidate pool from database for explicit industry
-    cursor = db.movies.find(query).sort("popularity", -1).limit(100)
+    effective_per_page = limit if limit else per_page
+    skip_val = (page - 1) * effective_per_page
+
+    cursor = db.movies.find(query).sort("popularity", -1).skip(skip_val).limit(effective_per_page)
     candidates = [m async for m in cursor]
 
-    if not candidates:
-        cursor = db.movies.find(query).limit(50)
+    if not candidates and page == 1:
+        cursor = db.movies.find(query).limit(effective_per_page)
         candidates = [m async for m in cursor]
 
     if candidates:
-        selected = candidates[:limit]
-        for m in selected:
+        for m in candidates:
             m_dict = {
                 "title": m.get("title", ""),
                 "genres": m.get("genres", []),
@@ -240,14 +245,17 @@ async def industry_based(
                 "explanation": exp_text,
             })
 
-    return format_recs(recs, f"industry-{ind_lower}")
+    total_pages = max(1, (total_count + effective_per_page - 1) // effective_per_page)
+    return format_recs(recs, f"industry-{ind_lower}", total=total_count, page=page, pages=total_pages)
 
 
 # ── 2. Mood-Based Recommendations (Global Multi-Industry) ────────────────────
 @router.get("/mood/{mood}", response_model=RecommendationResponse)
 async def mood_based(
     mood: str,
-    limit: int = Query(20, ge=1, le=100),
+    page: int = Query(1, ge=1),
+    per_page: int = Query(24, ge=1, le=100),
+    limit: Optional[int] = Query(None, ge=1, le=1000),
 ):
     mood_key = mood.lower().replace("-", "").replace(" ", "")
     db = get_database()
@@ -266,11 +274,15 @@ async def mood_based(
     if config.get("exclude_genres"):
         query["genres"]["$nin"] = config["exclude_genres"]
 
-    cursor = db.movies.find(query).sort("vote_average", -1).limit(300)
+    total_count = await db.movies.count_documents(query)
+    effective_per_page = limit if limit else per_page
+    skip_val = (page - 1) * effective_per_page
+
+    cursor = db.movies.find(query).sort("vote_average", -1).skip(skip_val).limit(effective_per_page)
     candidates = [m async for m in cursor]
 
-    if not candidates:
-        cursor = db.movies.find({"genres": {"$in": config["include_genres"]}}).sort("vote_average", -1).limit(100)
+    if not candidates and page == 1:
+        cursor = db.movies.find({"genres": {"$in": config["include_genres"]}}).sort("vote_average", -1).limit(effective_per_page)
         candidates = [m async for m in cursor]
 
     scored = []
@@ -285,8 +297,7 @@ async def mood_based(
     scored.sort(key=lambda x: x[0], reverse=True)
     all_sorted = [m for _, m in scored]
 
-    # Apply global industry diversity interleaver
-    top_candidates = interleave_by_industry(all_sorted, max_per_lang_ratio=0.35, target_limit=limit)
+    top_candidates = interleave_by_industry(all_sorted, max_per_lang_ratio=0.35, target_limit=effective_per_page)
 
     for m in top_candidates:
         m_dict = {
@@ -307,27 +318,38 @@ async def mood_based(
             "explanation": exp_text,
         })
 
-    return format_recs(recs, f"mood-{mood_key}")
+    total_pages = max(1, (total_count + effective_per_page - 1) // effective_per_page)
+    return format_recs(recs, f"mood-{mood_key}", total=total_count, page=page, pages=total_pages)
 
 
 # ── 3. Genre-Based Recommendations (Global Multi-Industry) ───────────────────
 @router.get("/genre", response_model=RecommendationResponse)
 async def genre_based(
     genres: str = Query(..., description="Comma-separated genres"),
-    limit: int = Query(20, ge=1, le=100),
+    page: int = Query(1, ge=1),
+    per_page: int = Query(24, ge=1, le=100),
+    limit: Optional[int] = Query(None, ge=1, le=1000),
 ):
     genre_list = [g.strip() for g in genres.split(",") if g.strip()]
     recs = []
     db = get_database()
 
-    cursor = db.movies.find({"genres": {"$all": genre_list}} if len(genre_list) > 1 else {"genres": {"$in": genre_list}}).sort("vote_average", -1).limit(300)
+    query = {"genres": {"$all": genre_list}} if len(genre_list) > 1 else {"genres": {"$in": genre_list}}
+    total_count = await db.movies.count_documents(query)
+
+    effective_per_page = limit if limit else per_page
+    skip_val = (page - 1) * effective_per_page
+
+    cursor = db.movies.find(query).sort("vote_average", -1).skip(skip_val).limit(effective_per_page)
     candidates = [m async for m in cursor]
 
-    if not candidates and len(genre_list) > 1:
-        cursor = db.movies.find({"genres": {"$in": genre_list}}).sort("vote_average", -1).limit(300)
+    if not candidates and len(genre_list) > 1 and page == 1:
+        query = {"genres": {"$in": genre_list}}
+        total_count = await db.movies.count_documents(query)
+        cursor = db.movies.find(query).sort("vote_average", -1).limit(effective_per_page)
         candidates = [m async for m in cursor]
 
-    top_candidates = interleave_by_industry(candidates, max_per_lang_ratio=0.35, target_limit=limit)
+    top_candidates = interleave_by_industry(candidates, max_per_lang_ratio=0.35, target_limit=effective_per_page)
 
     for m in top_candidates:
         m_dict = {
@@ -348,22 +370,29 @@ async def genre_based(
             "explanation": exp_text,
         })
 
-    return format_recs(recs, "genre-based")
+    total_pages = max(1, (total_count + effective_per_page - 1) // effective_per_page)
+    return format_recs(recs, "genre-based", total=total_count, page=page, pages=total_pages)
 
 
 # ── 4. Popularity-Based Recommendations (Global Multi-Industry) ──────────────
 @router.get("/popular", response_model=RecommendationResponse)
 async def popularity_based(
-    limit: int = Query(20, ge=1, le=100),
     mode: str = Query("weighted", pattern="^(weighted|trending|popular|top_rated)$"),
+    page: int = Query(1, ge=1),
+    per_page: int = Query(24, ge=1, le=100),
+    limit: Optional[int] = Query(None, ge=1, le=1000),
 ):
     db = get_database()
     recs = []
     sort_field = "trending_score" if mode == "trending" else ("popularity" if mode == "popular" else "weighted_rating")
 
-    cursor = db.movies.find({}).sort(sort_field, -1).limit(300)
+    total_count = await db.movies.count_documents({})
+    effective_per_page = limit if limit else per_page
+    skip_val = (page - 1) * effective_per_page
+
+    cursor = db.movies.find({}).sort(sort_field, -1).skip(skip_val).limit(effective_per_page)
     candidates = [m async for m in cursor]
-    top_candidates = interleave_by_industry(candidates, max_per_lang_ratio=0.35, target_limit=limit)
+    top_candidates = interleave_by_industry(candidates, max_per_lang_ratio=0.35, target_limit=effective_per_page)
 
     for m in top_candidates:
         m_dict = {
@@ -384,7 +413,8 @@ async def popularity_based(
             "explanation": exp_text,
         })
 
-    return format_recs(recs, f"popularity-{mode}")
+    total_pages = max(1, (total_count + effective_per_page - 1) // effective_per_page)
+    return format_recs(recs, f"popular-{mode}", total=total_count, page=page, pages=total_pages)
 
 
 # ── 5. Semantic Search Recommendations (Global Multi-Industry) ───────────────

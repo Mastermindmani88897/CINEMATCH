@@ -18,6 +18,8 @@ class RecommendationResponse(BaseModel):
     recommendations: List[RecommendationItem]
     algorithm: str
     total: int
+    page: Optional[int] = 1
+    pages: Optional[int] = 1
 
 
 class SemanticSearchRequest(BaseModel):

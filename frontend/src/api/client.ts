@@ -97,20 +97,24 @@ export const movieApi = {
 };
 
 export const recApi = {
-  getIndustryRecs: async (industry: string, limit = 100) => {
-    const { data } = await api.get<RecommendationResponse>(`/recommendations/industry/${industry}`, { params: { limit } });
+  getIndustryRecs: async (industry: string, params?: any) => {
+    const p = typeof params === 'number' ? { limit: params } : params;
+    const { data } = await api.get<RecommendationResponse>(`/recommendations/industry/${industry}`, { params: p });
     return data;
   },
-  getPopularRecs: async (mode = 'weighted', limit = 100) => {
-    const { data } = await api.get<RecommendationResponse>('/recommendations/popular', { params: { mode, limit } });
+  getPopularRecs: async (mode = 'weighted', params?: any) => {
+    const p = typeof params === 'number' ? { limit: params, mode } : { mode, ...params };
+    const { data } = await api.get<RecommendationResponse>('/recommendations/popular', { params: p });
     return data;
   },
-  getGenreRecs: async (genres: string, limit = 100) => {
-    const { data } = await api.get<RecommendationResponse>('/recommendations/genre', { params: { genres, limit } });
+  getGenreRecs: async (genres: string, params?: any) => {
+    const p = typeof params === 'number' ? { limit: params, genres } : { genres, ...params };
+    const { data } = await api.get<RecommendationResponse>('/recommendations/genre', { params: p });
     return data;
   },
-  getMoodRecs: async (mood: string, limit = 100) => {
-    const { data } = await api.get<RecommendationResponse>(`/recommendations/mood/${mood}`, { params: { limit } });
+  getMoodRecs: async (mood: string, params?: any) => {
+    const p = typeof params === 'number' ? { limit: params } : params;
+    const { data } = await api.get<RecommendationResponse>(`/recommendations/mood/${mood}`, { params: p });
     return data;
   },
   getMoods: async () => {
@@ -121,7 +125,7 @@ export const recApi = {
     const { data } = await api.get<{ industries: string[] }>('/recommendations/industries');
     return data.industries;
   },
-  postSemanticSearch: async (query: string, limit = 20) => {
+  postSemanticSearch: async (query: string, limit = 40) => {
     const { data } = await api.post<RecommendationResponse>('/recommendations/semantic', { query, limit });
     return data;
   },

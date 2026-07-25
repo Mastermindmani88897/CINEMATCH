@@ -43,6 +43,10 @@ export const RecommendationPage: React.FC = () => {
 
   const [results, setResults] = useState<RecommendationItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [allGenres, setAllGenres] = useState<string[]>([]);
 
   useEffect(() => {
@@ -53,6 +57,7 @@ export const RecommendationPage: React.FC = () => {
   const handleTabChange = (newTab: AlgoType) => {
     setActiveTab(newTab);
     setResults([]);
+    setPage(1);
     // Reset defaults to guarantee clean state
     if (newTab === 'industry') setSelectedIndustry('tollywood');
     if (newTab === 'mood') setSelectedMood('happy');
@@ -63,6 +68,7 @@ export const RecommendationPage: React.FC = () => {
 
   const handleResetFilters = () => {
     setResults([]);
+    setPage(1);
     if (activeTab === 'industry') setSelectedIndustry('tollywood');
     if (activeTab === 'mood') setSelectedMood('happy');
     if (activeTab === 'genre') setSelectedGenres([]);
@@ -71,41 +77,68 @@ export const RecommendationPage: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchRecommendations();
+    setPage(1);
+    fetchRecommendations(1, false);
   }, [activeTab, selectedIndustry, selectedMood, selectedGenres, popularityMode]);
 
-  const fetchRecommendations = async () => {
-    setLoading(true);
+  const fetchRecommendations = async (pageNum = 1, append = false) => {
+    if (append) {
+      setLoadingMore(true);
+    } else {
+      setLoading(true);
+    }
     try {
       let res;
+      const params = { page: pageNum, per_page: 24 };
       if (activeTab === 'industry') {
-        res = await recApi.getIndustryRecs(selectedIndustry);
+        res = await recApi.getIndustryRecs(selectedIndustry, params);
       } else if (activeTab === 'mood') {
-        res = await recApi.getMoodRecs(selectedMood);
+        res = await recApi.getMoodRecs(selectedMood, params);
       } else if (activeTab === 'genre') {
         if (selectedGenres.length === 0) {
           setResults([]);
           setLoading(false);
+          setLoadingMore(false);
           return;
         }
-        res = await recApi.getGenreRecs(selectedGenres.join(','));
+        res = await recApi.getGenreRecs(selectedGenres.join(','), params);
       } else if (activeTab === 'popularity') {
-        res = await recApi.getPopularRecs(popularityMode);
+        res = await recApi.getPopularRecs(popularityMode, params);
       } else if (activeTab === 'semantic' && semanticQuery.trim()) {
         res = await recApi.postSemanticSearch(semanticQuery);
       }
-      if (res) setResults(res.recommendations);
+      if (res) {
+        if (append) {
+          setResults((prev) => {
+            const existingIds = new Set(prev.map((r: RecommendationItem) => r.movie_id));
+            const newUnique = res.recommendations.filter((r: RecommendationItem) => !existingIds.has(r.movie_id));
+            return [...prev, ...newUnique];
+          });
+        } else {
+          setResults(res.recommendations);
+        }
+        setTotal(res.total || res.recommendations.length);
+        setTotalPages(res.pages || 1);
+        setPage(pageNum);
+      }
     } catch (err) {
       console.error('Failed to load recommendations', err);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
+    }
+  };
+
+  const handleLoadMore = () => {
+    if (page < totalPages && !loadingMore) {
+      fetchRecommendations(page + 1, true);
     }
   };
 
   const handleSemanticSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (semanticQuery.trim()) {
-      fetchRecommendations();
+      fetchRecommendations(1, false);
     }
   };
 
@@ -265,12 +298,50 @@ export const RecommendationPage: React.FC = () => {
         )}
       </div>
 
+      {/* Count Header Badge */}
+      {!loading && total > 0 && (
+        <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 px-4 py-3 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl text-xs text-gray-300">
+          <div>
+            Showing <strong className="text-[var(--color-accent)] font-extrabold">{results.length}</strong> of <strong className="text-white font-extrabold">{total.toLocaleString()}</strong> movies in database
+          </div>
+          <a
+            href={`/search?${activeTab === 'industry' ? `q=${selectedIndustry}` : (activeTab === 'genre' ? `genres=${selectedGenres.join(',')}` : `q=${activeTab}`)}`}
+            className="text-[var(--color-primary-light)] font-bold hover:underline"
+          >
+            Explore all {total.toLocaleString()} in Deep Search & Filter →
+          </a>
+        </div>
+      )}
+
       {/* Results */}
       <div className="max-w-4xl mx-auto space-y-4">
         {loading ? (
           Array.from({ length: 5 }).map((_, i) => <RecommendationCardSkeleton key={i} />)
         ) : results.length > 0 ? (
-          results.map((item) => <RecommendationCard key={item.movie_id} item={item} />)
+          <>
+            {results.map((item) => <RecommendationCard key={item.movie_id} item={item} />)}
+
+            {/* Load More Button */}
+            {page < totalPages && (
+              <div className="text-center pt-6">
+                <button
+                  onClick={handleLoadMore}
+                  disabled={loadingMore}
+                  className="btn-primary px-8 py-3 rounded-xl text-sm font-bold inline-flex items-center gap-2"
+                >
+                  {loadingMore ? (
+                    <>
+                      <ArrowPathIcon className="w-4 h-4 animate-spin" /> Loading more movies...
+                    </>
+                  ) : (
+                    <>
+                      Load More Movies (Page {page + 1} of {totalPages})
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
+          </>
         ) : (
           <div className="text-center py-12 text-gray-400 bg-[var(--color-surface)] rounded-2xl border border-[var(--color-border)] p-8">
             <div className="text-4xl mb-2">🎬</div>
