@@ -268,7 +268,7 @@ export const HomePage: React.FC = () => {
         <div className="flex items-center justify-between">
           <div>
             <h2 className="section-title mb-1">Explore Full Movie Catalog</h2>
-            <p className="text-gray-400 text-sm">Discover all 5,000+ movies in our database</p>
+            <p className="text-gray-400 text-sm">Discover all 20,000+ movies in our database</p>
           </div>
           <span className="text-xs font-semibold px-3 py-1 rounded-full bg-[var(--color-surface-2)] text-gray-300 border border-[var(--color-border)]">
             Page {page}

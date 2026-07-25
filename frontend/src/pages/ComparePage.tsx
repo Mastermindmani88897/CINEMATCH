@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { movieApi, recApi } from '../api/client';
+import { movieApi } from '../api/client';
 import type { Movie } from '../types';
 import { AdjustmentsHorizontalIcon } from '@heroicons/react/24/solid';
 
@@ -24,10 +24,11 @@ export const ComparePage: React.FC = () => {
           const m2 = await movieApi.getMovieById(parseInt(m2Id));
           setMovie2(m2);
 
-          try {
-            const exp = await recApi.getExplanation(m1.id, m2.id);
-            setSimilarityScore(exp.similarity_score);
-          } catch {}
+          const genreOverlap = (m1.genres || []).filter((g: string) => (m2.genres || []).includes(g)).length;
+          const totalGenres = new Set([...(m1.genres || []), ...(m2.genres || [])]).size || 1;
+          const ratingDiff = Math.abs((m1.vote_average || 0) - (m2.vote_average || 0));
+          const score = Math.max(0.1, (genreOverlap / totalGenres) * 0.7 + Math.max(0, 1 - ratingDiff / 5) * 0.3);
+          setSimilarityScore(score);
         }
       } catch (err) {
         console.error('Failed comparison fetch', err);

@@ -41,7 +41,7 @@ export const Footer: React.FC = () => {
               <li>Semantic (MiniLM-L6)</li>
               <li>Popularity & Bayesian Rating</li>
               <li>Mood & Genre Filtering</li>
-              <li>Personalized Taste Analysis</li>
+              <li>Industry & Multi-Regional Support</li>
             </ul>
           </div>
 
@@ -49,7 +49,7 @@ export const Footer: React.FC = () => {
           <div>
             <h4 className="font-semibold text-white mb-4 text-sm font-['Outfit'] uppercase tracking-wider">Tech Stack</h4>
             <div className="flex flex-wrap gap-2">
-              {['FastAPI', 'React', 'TypeScript', 'Tailwind', 'scikit-learn', 'PyTorch', 'PostgreSQL', 'Zustand'].map((tech) => (
+              {['FastAPI', 'React 19', 'TypeScript', 'Tailwind CSS', 'MongoDB Atlas', 'scikit-learn', 'PyTorch', 'Zustand'].map((tech) => (
                 <span key={tech} className="text-xs px-2.5 py-1 rounded-md bg-[var(--color-surface-2)] text-gray-300 border border-[var(--color-border)]">
                   {tech}
                 </span>

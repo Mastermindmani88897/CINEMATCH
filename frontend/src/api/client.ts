@@ -1,8 +1,7 @@
 import axios from 'axios';
 import type {
   Movie, PaginatedResponse, RecommendationResponse,
-  ExplanationResponse, TasteAnalysis, SearchSuggestion,
-  RatingResponse, ReviewResponse, NoteResponse
+  SearchSuggestion, RatingResponse, ReviewResponse, NoteResponse
 } from '../types';
 
 function getRawApiUrl(): string {
@@ -90,8 +89,8 @@ export const movieApi = {
 };
 
 export const recApi = {
-  getContentRecs: async (movieId: number, limit = 20) => {
-    const { data } = await api.get<RecommendationResponse>(`/recommendations/content/${movieId}`, { params: { limit } });
+  getIndustryRecs: async (industry: string, limit = 20) => {
+    const { data } = await api.get<RecommendationResponse>(`/recommendations/industry/${industry}`, { params: { limit } });
     return data;
   },
   getPopularRecs: async (mode = 'weighted', limit = 20) => {
@@ -110,20 +109,12 @@ export const recApi = {
     const { data } = await api.get<{ moods: string[] }>('/recommendations/moods');
     return data.moods;
   },
-  postSemanticSearch: async (query: string, top_k = 20) => {
-    const { data } = await api.post<RecommendationResponse>('/recommendations/semantic', { query, top_k });
-    return data;
+  getIndustries: async () => {
+    const { data } = await api.get<{ industries: string[] }>('/recommendations/industries');
+    return data.industries;
   },
-  getPersonalizedRecs: async (limit = 20) => {
-    const { data } = await api.get<RecommendationResponse>('/recommendations/personalized', { params: { limit } });
-    return data;
-  },
-  getExplanation: async (movieId: number, sourceId?: number) => {
-    const { data } = await api.get<ExplanationResponse>('/recommendations/explanation', { params: { movie_id: movieId, source_id: sourceId } });
-    return data;
-  },
-  getTasteAnalysis: async () => {
-    const { data } = await api.get<TasteAnalysis>('/recommendations/taste-analysis');
+  postSemanticSearch: async (query: string, limit = 20) => {
+    const { data } = await api.post<RecommendationResponse>('/recommendations/semantic', { query, limit });
     return data;
   },
 };

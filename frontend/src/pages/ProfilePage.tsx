@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuthStore } from '../store/authStore';
-import { recApi, userApi } from '../api/client';
+import { userApi } from '../api/client';
 import type { TasteAnalysis, Movie } from '../types';
 import { MovieCard } from '../components/common/MovieCard';
 import { HeartIcon, BookmarkIcon, ClockIcon, ChartPieIcon } from '@heroicons/react/24/solid';
@@ -19,16 +19,56 @@ export const ProfilePage: React.FC = () => {
   useEffect(() => {
     const fetchUserData = async () => {
       try {
-        const [t, f, w, h] = await Promise.all([
-          recApi.getTasteAnalysis().catch(() => null),
+        const [f, w, h] = await Promise.all([
           userApi.getFavorites().catch(() => []),
           userApi.getWatchlist().catch(() => []),
           userApi.getHistory().catch(() => []),
         ]);
-        setTaste(t);
         setFavorites(f);
         setWatchlist(w);
         setHistory(h);
+
+        const allUserMovies = [...f, ...w, ...h];
+        if (allUserMovies.length > 0) {
+          const genreCounts: Record<string, number> = {};
+          let totalRating = 0;
+          let countRating = 0;
+          const decadeCounts: Record<string, number> = {};
+
+          for (const m of allUserMovies) {
+            for (const g of m.genres || []) {
+              genreCounts[g] = (genreCounts[g] || 0) + 1;
+            }
+            if (m.vote_average) {
+              totalRating += m.vote_average;
+              countRating += 1;
+            }
+            if (m.release_year) {
+              const decade = `${Math.floor(m.release_year / 10) * 10}s`;
+              decadeCounts[decade] = (decadeCounts[decade] || 0) + 1;
+            }
+          }
+
+          const totalGenreEntries = Object.values(genreCounts).reduce((a, b) => a + b, 0) || 1;
+          const favoriteGenres = Object.entries(genreCounts)
+            .map(([genre, count]) => ({ genre, count, percentage: Math.round((count / totalGenreEntries) * 100) }))
+            .sort((a, b) => b.count - a.count);
+
+          const topDecade = Object.entries(decadeCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || '2020s';
+
+          setTaste({
+            personality: favoriteGenres[0]?.genre ? `${favoriteGenres[0].genre} Cinephile` : 'Cinema Explorer',
+            personality_description: `You show a strong affinity for ${favoriteGenres[0]?.genre || 'diverse'} films, preferring ${topDecade} cinema.`,
+            favorite_genres: favoriteGenres,
+            average_rating: countRating > 0 ? totalRating / countRating : 8.0,
+            favorite_decade: topDecade,
+            favorite_actors: [],
+            favorite_directors: [],
+            total_watched: h.length,
+            total_rated: countRating,
+            genre_distribution: Object.entries(genreCounts).map(([genre, count]) => ({ genre, count })),
+          });
+        }
       } catch {}
     };
     fetchUserData();

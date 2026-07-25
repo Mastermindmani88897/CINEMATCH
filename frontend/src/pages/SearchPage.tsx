@@ -205,6 +205,20 @@ export const SearchPage: React.FC = () => {
               <option value="release_year">Newest First</option>
             </select>
           )}
+
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedGenre('');
+              setSelectedYear('');
+              setSelectedLanguage('');
+              setMinRating('0');
+              setSortBy('popularity');
+            }}
+            className="flex items-center gap-1 text-xs font-semibold text-gray-400 hover:text-white transition-colors py-2 px-3 rounded-lg bg-[var(--color-surface-2)] border border-[var(--color-border)]"
+          >
+            <ArrowPathIcon className="w-3.5 h-3.5" /> Clear Filters
+          </button>
         </div>
       </div>
 

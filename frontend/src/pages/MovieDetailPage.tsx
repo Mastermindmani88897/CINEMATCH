@@ -39,7 +39,11 @@ export const MovieDetailPage: React.FC = () => {
         const data = await movieApi.getMovieById(movieId);
         setMovie(data);
 
-        recApi.getContentRecs(movieId, 10).then((r) => setRecommendations(r.recommendations)).catch(() => {});
+        if (data.genres && data.genres.length > 0) {
+          recApi.getGenreRecs(data.genres[0], 10).then((r) => setRecommendations(r.recommendations)).catch(() => {});
+        } else {
+          recApi.getPopularRecs('weighted', 10).then((r) => setRecommendations(r.recommendations)).catch(() => {});
+        }
         userApi.getReviews(movieId).then(setReviews).catch(() => {});
 
         if (isAuthenticated) {
@@ -287,7 +291,7 @@ export const MovieDetailPage: React.FC = () => {
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6 pt-8 border-t border-[var(--color-border)]">
           <div className="flex items-center gap-3">
             <SparklesIcon className="w-6 h-6 text-[var(--color-accent)]" />
-            <h2 className="section-title mb-0">AI Content-Based Similar Movies</h2>
+            <h2 className="section-title mb-0">More Movies You Might Enjoy</h2>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 sm:gap-6">
             {recommendations.slice(0, 5).map((rec) => (

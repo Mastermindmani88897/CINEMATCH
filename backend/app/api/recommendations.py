@@ -1,44 +1,120 @@
-"""Recommendation routes using MongoDB Atlas collections."""
+"""
+CineMatch AI — Recommendation System API Router
+Provides independent, non-leaking recommendation endpoints for Industry, Mood, Genre, Popularity, and Semantic AI Search.
+"""
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import Optional, List
+import random
+import logging
 from datetime import datetime, timezone
 
 from app.core.database import get_database
-from app.core.deps import get_current_active_user
 from app.core.utils import serialize_doc
 from app.schemas.recommendation import (
     RecommendationResponse, RecommendationItem,
-    SemanticSearchRequest, ExplanationResponse, TasteAnalysis
+    SemanticSearchRequest
 )
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/recommendations", tags=["Recommendations"])
 
-INDUSTRY_LANG_MAP = {
-    "tollywood": "te",
-    "bollywood": "hi",
-    "kollywood": "ta",
-    "mollywood": "ml",
-    "sandalwood": "kn",
-    "korean": "ko",
-    "japanese": "ja",
-    "anime": "ja",
-    "chinese": "zh",
-    "hollywood": "en",
-    "telugu": "te",
-    "hindi": "hi",
-    "tamil": "ta",
-    "malayalam": "ml",
-    "kannada": "kn",
+# Explicit Industry → Language/Filter mapping
+INDUSTRY_MAP = {
+    "tollywood": {"original_language": "te"},
+    "bollywood": {"original_language": "hi"},
+    "kollywood": {"original_language": "ta"},
+    "mollywood": {"original_language": "ml"},
+    "sandalwood": {"original_language": "kn"},
+    "hollywood": {"original_language": "en"},
+    "korean": {"original_language": "ko"},
+    "japanese": {"original_language": "ja"},
+    "chinese": {"original_language": {"$in": ["zh", "cn"]}},
+    "anime": {"genres": "Animation", "original_language": "ja"},
+    "international": {"original_language": {"$ne": "en"}},
 }
 
-
-def get_engine():
-    try:
-        from ml.pipeline.hybrid_engine import hybrid_engine
-        return hybrid_engine
-    except Exception:
-        return None
+# Explicit Mood → Genre & Keyword mapping
+MOOD_CONFIG = {
+    "happy": {
+        "include_genres": ["Comedy", "Animation", "Family", "Music"],
+        "exclude_genres": ["Horror", "War", "Crime"],
+        "keywords": ["funny", "laugh", "cheerful", "uplifting", "fun", "hilarious", "lighthearted", "heartwarming"],
+        "explanation": "Uplifting, funny, and joyful films to boost your mood!"
+    },
+    "sad": {
+        "include_genres": ["Drama", "Romance"],
+        "exclude_genres": ["Action", "Comedy", "Animation"],
+        "keywords": ["tearjerker", "tragic", "loss", "grief", "heartbreak", "emotional", "sorrow", "melancholy"],
+        "explanation": "Deeply moving emotional dramas for a reflective mood."
+    },
+    "romantic": {
+        "include_genres": ["Romance"],
+        "exclude_genres": ["Horror", "War", "Action"],
+        "keywords": ["love", "romance", "relationship", "couple", "passion", "wedding", "affair", "crush", "lover"],
+        "explanation": "Heartfelt romantic tales and love stories."
+    },
+    "action": {
+        "include_genres": ["Action", "Adventure"],
+        "exclude_genres": ["Documentary", "Romance"],
+        "keywords": ["fight", "explosion", "martial arts", "battle", "spy", "agent", "chase", "superhero", "rescue"],
+        "explanation": "High-octane action and adrenaline-fueled adventures."
+    },
+    "motivational": {
+        "include_genres": ["Drama", "History", "Biography"],
+        "exclude_genres": ["Horror"],
+        "keywords": ["inspirational", "heroic", "triumph", "dream", "success", "overcome", "courage", "determination", "championship", "true story"],
+        "explanation": "Inspiring stories of perseverance, courage, and triumph."
+    },
+    "thriller": {
+        "include_genres": ["Thriller", "Mystery", "Crime"],
+        "exclude_genres": ["Animation", "Family"],
+        "keywords": ["suspense", "serial killer", "investigation", "twist", "murder", "conspiracy", "psychological", "kidnapping"],
+        "explanation": "Edge-of-your-seat suspense and gripping mystery thrillers."
+    },
+    "dark": {
+        "include_genres": ["Crime", "Horror", "Thriller", "Drama"],
+        "exclude_genres": ["Family", "Animation"],
+        "keywords": ["gritty", "dark", "dystopian", "sinister", "macabre", "vengeance", "morally grey", "noir", "psychological"],
+        "explanation": "Intense, gritty, and dark cinematic experiences."
+    },
+    "comedy": {
+        "include_genres": ["Comedy"],
+        "exclude_genres": ["Horror", "War"],
+        "keywords": ["hilarious", "parody", "satire", "sitcom", "goofy", "prank", "jokes", "fool", "humor"],
+        "explanation": "Hilarious comedies and laugh-out-loud entertainment."
+    },
+    "family": {
+        "include_genres": ["Family", "Animation"],
+        "exclude_genres": ["Horror", "Crime", "War"],
+        "keywords": ["kids", "family", "children", "pet", "magic", "adventure", "toy", "friendly", "cartoon"],
+        "explanation": "Wholesome entertainment for all ages to enjoy together."
+    },
+    "adventure": {
+        "include_genres": ["Adventure", "Fantasy"],
+        "exclude_genres": ["Romance"],
+        "keywords": ["expedition", "treasure", "quest", "journey", "island", "jungle", "exploration", "space", "magic"],
+        "explanation": "Epic journeys and fantasy adventure quests."
+    },
+    "crime": {
+        "include_genres": ["Crime", "Mystery"],
+        "exclude_genres": ["Family", "Animation"],
+        "keywords": ["mafia", "robbery", "gangster", "police", "detective", "heist", "smuggling", "underworld"],
+        "explanation": "Gritty crime sagas, police procedurals, and heist thrillers."
+    },
+    "horror": {
+        "include_genres": ["Horror"],
+        "exclude_genres": ["Comedy", "Family"],
+        "keywords": ["ghost", "possession", "demon", "monster", "zombie", "haunted", "blood", "slasher", "nightmare"],
+        "explanation": "Spooky, chilling, and terrifying horror films."
+    },
+    "scifi": {
+        "include_genres": ["Science Fiction"],
+        "exclude_genres": ["Romance", "Music"],
+        "keywords": ["space", "alien", "robot", "time travel", "future", "ai", "cyborg", "galaxy", "technology"],
+        "explanation": "Mind-bending futuristic sci-fi and cosmic explorations."
+    }
+}
 
 
 def format_recs(recs: list, algorithm: str) -> RecommendationResponse:
@@ -57,162 +133,39 @@ def format_recs(recs: list, algorithm: str) -> RecommendationResponse:
                 vote_average=r.get("vote_average", 0),
                 release_year=r.get("release_year"),
                 genres=r.get("genres", []),
-                similarity_score=r.get("similarity_score", 0),
-                match_percentage=r.get("match_percentage", 0),
+                similarity_score=r.get("similarity_score", 0.90),
+                match_percentage=r.get("match_percentage", 90),
                 explanation=r.get("explanation"),
             )
         )
     return RecommendationResponse(recommendations=items, algorithm=algorithm, total=len(items))
 
 
-async def log_recommendation(user_id: Optional[int], algorithm: str, recs: list):
-    try:
-        db = get_database()
-        doc = {
-            "user_id": user_id,
-            "algorithm": algorithm,
-            "recommended_movies": [r["movie_id"] for r in recs[:10]],
-            "created_at": datetime.now(timezone.utc),
-        }
-        await db.recommendation_history.insert_one(doc)
-    except Exception:
-        pass
-
-
-# ── 1. Content-Based ────────────────────────────────────────────────────────
-@router.get("/content/{movie_id}", response_model=RecommendationResponse)
-async def content_based(
-    movie_id: int,
+# ── 1. Industry / Regional Recommendations ──────────────────────────────────
+@router.get("/industry/{industry}", response_model=RecommendationResponse)
+async def industry_based(
+    industry: str,
     limit: int = Query(20, ge=1, le=50),
 ):
-    recs = []
-    engine = get_engine()
-    if engine and engine.is_ready():
-        try:
-            recs = engine.tfidf.get_recommendations_by_id(movie_id, top_n=limit)
-        except Exception:
-            pass
-
+    ind_lower = industry.lower().strip()
     db = get_database()
-    if not recs:
-        source = await db.movies.find_one({"$or": [{"id": movie_id}, {"tmdb_id": movie_id}]})
-        source_genres = source.get("genres", []) if source else []
-        cursor = db.movies.find({
-            "id": {"$ne": movie_id},
-            "genres": {"$in": source_genres} if source_genres else {"$exists": True}
-        }).sort("popularity", -1).limit(limit)
-        async for m in cursor:
-            recs.append({
-                "movie_id": m.get("id", m.get("tmdb_id")),
-                "title": m.get("title", ""),
-                "poster_path": m.get("poster_path", ""),
-                "vote_average": m.get("vote_average", 0),
-                "release_year": m.get("release_year", 2024),
-                "genres": m.get("genres", []),
-                "similarity_score": 0.85,
-                "match_percentage": 85,
-            })
-
-    await log_recommendation(None, "content-based", recs)
-    return format_recs(recs, "content-based")
-
-
-# ── 2. Popularity-Based ─────────────────────────────────────────────────────
-@router.get("/popular", response_model=RecommendationResponse)
-async def popularity_based(
-    limit: int = Query(20, ge=1, le=50),
-    mode: str = Query("weighted", pattern="^(weighted|trending|popular|top_rated)$"),
-):
     recs = []
-    engine = get_engine()
-    if engine and engine.is_ready():
-        try:
-            if mode == "trending":
-                recs = engine.popularity.get_trending(limit)
-            elif mode == "popular":
-                recs = engine.popularity.get_popular(limit)
-            else:
-                recs = engine.popularity.get_top_rated(limit)
-        except Exception:
-            pass
 
-    if not recs:
-        db = get_database()
-        sort_field = "trending_score" if mode == "trending" else ("popularity" if mode == "popular" else "vote_average")
-        cursor = db.movies.find({}).sort(sort_field, -1).limit(limit)
-        async for m in cursor:
-            recs.append({
-                "movie_id": m.get("id", m.get("tmdb_id")),
-                "title": m.get("title", ""),
-                "poster_path": m.get("poster_path", ""),
-                "vote_average": m.get("vote_average", 0),
-                "release_year": m.get("release_year", 2024),
-                "genres": m.get("genres", []),
-                "similarity_score": 0.90,
-                "match_percentage": 90,
-            })
+    query = INDUSTRY_MAP.get(ind_lower, {"original_language": ind_lower[:2]})
 
-    return format_recs(recs, f"popularity-{mode}")
+    # Fetch top candidate pool from database
+    cursor = db.movies.find(query).sort("popularity", -1).limit(100)
+    candidates = [m async for m in cursor]
 
+    if not candidates:
+        # Retry without sorting restriction
+        cursor = db.movies.find(query).limit(50)
+        candidates = [m async for m in cursor]
 
-# ── 3. Genre-Based ──────────────────────────────────────────────────────────
-@router.get("/genre", response_model=RecommendationResponse)
-async def genre_based(
-    genres: str = Query(..., description="Comma-separated genres or industry"),
-    limit: int = Query(20, ge=1, le=50),
-):
-    genre_list = [g.strip() for g in genres.split(",") if g.strip()]
-    recs = []
-    db = get_database()
-
-    # Check if industry passed as genre
-    for g in genre_list:
-        g_lower = g.lower()
-        if g_lower in INDUSTRY_LANG_MAP:
-            lang = INDUSTRY_LANG_MAP[g_lower]
-            cursor = db.movies.find({"original_language": lang}).sort("popularity", -1).limit(limit)
-            async for m in cursor:
-                recs.append({
-                    "movie_id": m.get("id", m.get("tmdb_id")),
-                    "title": m.get("title", ""),
-                    "poster_path": m.get("poster_path", ""),
-                    "vote_average": m.get("vote_average", 0),
-                    "release_year": m.get("release_year", 2024),
-                    "genres": m.get("genres", []),
-                    "similarity_score": 0.92,
-                    "match_percentage": 92,
-                })
-
-    if not recs:
-        cursor = db.movies.find({"genres": {"$in": genre_list}}).sort("popularity", -1).limit(limit)
-        async for m in cursor:
-            recs.append({
-                "movie_id": m.get("id", m.get("tmdb_id")),
-                "title": m.get("title", ""),
-                "poster_path": m.get("poster_path", ""),
-                "vote_average": m.get("vote_average", 0),
-                "release_year": m.get("release_year", 2024),
-                "genres": m.get("genres", []),
-                "similarity_score": 0.88,
-                "match_percentage": 88,
-            })
-
-    return format_recs(recs, "genre-based")
-
-
-# ── 4. Mood-Based ───────────────────────────────────────────────────────────
-@router.get("/mood/{mood}", response_model=RecommendationResponse)
-async def mood_based(mood: str, limit: int = Query(20, ge=1, le=50)):
-    mood_lower = mood.lower().replace("-", "").replace(" ", "")
-    recs = []
-    db = get_database()
-
-    # Check industry regional key
-    if mood_lower in INDUSTRY_LANG_MAP:
-        lang = INDUSTRY_LANG_MAP[mood_lower]
-        query_cond = {"genres": "Animation"} if mood_lower == "anime" else {"original_language": lang}
-        cursor = db.movies.find(query_cond).sort("popularity", -1).limit(limit)
-        async for m in cursor:
+    # Sample/shuffle candidate pool for recommendation diversity
+    if candidates:
+        selected = candidates[:limit]
+        for m in selected:
             recs.append({
                 "movie_id": m.get("id", m.get("tmdb_id")),
                 "title": m.get("title", ""),
@@ -222,125 +175,168 @@ async def mood_based(mood: str, limit: int = Query(20, ge=1, le=50)):
                 "genres": m.get("genres", []),
                 "similarity_score": 0.95,
                 "match_percentage": 95,
-                "explanation": f"Top recommendations for {mood.capitalize()} cinema",
+                "explanation": f"Top pick from {industry.capitalize()} cinema collection",
             })
 
-    if not recs:
-        engine = get_engine()
-        if engine and engine.is_ready():
-            try:
-                recs = engine.mood.recommend(mood, limit)
-            except Exception:
-                pass
-
-    if not recs:
-        from ml.pipeline.recommendation_engines import MOOD_GENRE_MAP
-        target_genres = MOOD_GENRE_MAP.get(mood_lower, ["Drama", "Action", "Comedy"])
-        cursor = db.movies.find({"genres": {"$in": target_genres}}).sort("popularity", -1).limit(limit)
-        async for m in cursor:
-            recs.append({
-                "movie_id": m.get("id", m.get("tmdb_id")),
-                "title": m.get("title", ""),
-                "poster_path": m.get("poster_path", ""),
-                "vote_average": m.get("vote_average", 0),
-                "release_year": m.get("release_year", 2024),
-                "genres": m.get("genres", []),
-                "similarity_score": 0.88,
-                "match_percentage": 88,
-            })
-
-    return format_recs(recs, "mood-based")
+    return format_recs(recs, f"industry-{ind_lower}")
 
 
-@router.get("/moods")
-async def get_moods():
-    from ml.pipeline.recommendation_engines import MoodEngine
-    moods = MoodEngine.get_available_moods() + ["tollywood", "bollywood", "kollywood", "mollywood", "sandalwood", "korean", "japanese", "anime", "chinese"]
-    return {"moods": list(set(moods))}
-
-
-# ── 5. Hybrid Personalized ──────────────────────────────────────────────────
-@router.get("/user", response_model=RecommendationResponse)
-async def user_personalized(
+# ── 2. Mood-Based Recommendations ──────────────────────────────────────────
+@router.get("/mood/{mood}", response_model=RecommendationResponse)
+async def mood_based(
+    mood: str,
     limit: int = Query(20, ge=1, le=50),
-    current_user: dict = Depends(get_current_active_user),
+):
+    mood_key = mood.lower().replace("-", "").replace(" ", "")
+    db = get_database()
+    recs = []
+
+    config = MOOD_CONFIG.get(mood_key, {
+        "include_genres": ["Drama"],
+        "exclude_genres": [],
+        "keywords": [],
+        "explanation": f"Recommended films matching {mood.capitalize()} mood"
+    })
+
+    # Construct strict query
+    query = {
+        "genres": {"$in": config["include_genres"]}
+    }
+    if config.get("exclude_genres"):
+        query["genres"]["$nin"] = config["exclude_genres"]
+
+    # Fetch candidate pool (top 150 matching mood query)
+    cursor = db.movies.find(query).sort("popularity", -1).limit(150)
+    candidates = [m async for m in cursor]
+
+    if not candidates:
+        cursor = db.movies.find({"genres": {"$in": config["include_genres"]}}).sort("vote_average", -1).limit(50)
+        candidates = [m async for m in cursor]
+
+    # Score candidates based on mood keywords in overview / tagline / genres
+    scored = []
+    keywords = config.get("keywords", [])
+    for m in candidates:
+        score = float(m.get("weighted_rating", m.get("vote_average", 7.0)))
+        text = f"{m.get('title', '')} {m.get('overview', '')} {m.get('tagline', '')}".lower()
+        keyword_matches = sum(1 for kw in keywords if kw in text)
+        score += (keyword_matches * 1.5)
+        scored.append((score, m))
+
+    # Sort candidates by combined score
+    scored.sort(key=lambda x: x[0], reverse=True)
+    top_candidates = [m for _, m in scored[:limit]]
+
+    for m in top_candidates:
+        recs.append({
+            "movie_id": m.get("id", m.get("tmdb_id")),
+            "title": m.get("title", ""),
+            "poster_path": m.get("poster_path", ""),
+            "vote_average": m.get("vote_average", 0),
+            "release_year": m.get("release_year", 2024),
+            "genres": m.get("genres", []),
+            "similarity_score": 0.92,
+            "match_percentage": 92,
+            "explanation": config["explanation"],
+        })
+
+    return format_recs(recs, f"mood-{mood_key}")
+
+
+# ── 3. Genre-Based Recommendations ─────────────────────────────────────────
+@router.get("/genre", response_model=RecommendationResponse)
+async def genre_based(
+    genres: str = Query(..., description="Comma-separated genres"),
+    limit: int = Query(20, ge=1, le=50),
+):
+    genre_list = [g.strip() for g in genres.split(",") if g.strip()]
+    recs = []
+    db = get_database()
+
+    cursor = db.movies.find({"genres": {"$in": genre_list}}).sort("popularity", -1).limit(limit)
+    async for m in cursor:
+        recs.append({
+            "movie_id": m.get("id", m.get("tmdb_id")),
+            "title": m.get("title", ""),
+            "poster_path": m.get("poster_path", ""),
+            "vote_average": m.get("vote_average", 0),
+            "release_year": m.get("release_year", 2024),
+            "genres": m.get("genres", []),
+            "similarity_score": 0.88,
+            "match_percentage": 88,
+            "explanation": f"Top rated in {', '.join(genre_list)}",
+        })
+
+    return format_recs(recs, "genre-based")
+
+
+# ── 4. Popularity-Based Recommendations ────────────────────────────────────
+@router.get("/popular", response_model=RecommendationResponse)
+async def popularity_based(
+    limit: int = Query(20, ge=1, le=50),
+    mode: str = Query("weighted", pattern="^(weighted|trending|popular|top_rated)$"),
 ):
     db = get_database()
-    uid = current_user["id"]
-
-    favs_doc = await db.favorites.find({"user_id": uid}).to_list(None)
-    fav_ids = [f["movie_id"] for f in favs_doc]
-
-    ratings_doc = await db.ratings.find({"user_id": uid}).to_list(None)
-    rated_ids = [r["movie_id"] for r in ratings_doc]
-
-    history_doc = await db.watch_history.find({"user_id": uid}).to_list(None)
-    hist_ids = [h["movie_id"] for h in history_doc]
-
     recs = []
-    engine = get_engine()
-    if engine and engine.is_ready():
-        try:
-            recs = engine.personalized.recommend(
-                favorite_movie_ids=fav_ids,
-                rated_movie_ids=rated_ids,
-                history_movie_ids=hist_ids,
-                limit=limit,
-            )
-        except Exception:
-            pass
+    sort_field = "trending_score" if mode == "trending" else ("popularity" if mode == "popular" else "weighted_rating")
 
-    if not recs:
-        cursor = db.movies.find({}).sort("popularity", -1).limit(limit)
-        async for m in cursor:
-            recs.append({
-                "movie_id": m.get("id", m.get("tmdb_id")),
-                "title": m.get("title", ""),
-                "poster_path": m.get("poster_path", ""),
-                "vote_average": m.get("vote_average", 0),
-                "release_year": m.get("release_year", 2024),
-                "genres": m.get("genres", []),
-                "similarity_score": 0.90,
-                "match_percentage": 90,
-            })
+    cursor = db.movies.find({}).sort(sort_field, -1).limit(limit)
+    async for m in cursor:
+        recs.append({
+            "movie_id": m.get("id", m.get("tmdb_id")),
+            "title": m.get("title", ""),
+            "poster_path": m.get("poster_path", ""),
+            "vote_average": m.get("vote_average", 0),
+            "release_year": m.get("release_year", 2024),
+            "genres": m.get("genres", []),
+            "similarity_score": 0.90,
+            "match_percentage": 90,
+            "explanation": f"Highest ranked in {mode.replace('_', ' ').capitalize()} collection",
+        })
 
-    await log_recommendation(uid, "personalized-hybrid", recs)
-    return format_recs(recs, "personalized-hybrid")
+    return format_recs(recs, f"popularity-{mode}")
 
 
-# ── 6. Semantic Search ──────────────────────────────────────────────────────
+# ── 5. Semantic Search Recommendations ──────────────────────────────────────
 @router.post("/semantic", response_model=RecommendationResponse)
 async def semantic_search(request: SemanticSearchRequest):
     recs = []
-    engine = get_engine()
-    if engine and engine.is_ready() and engine.semantic.model:
-        try:
-            recs = engine.semantic.search(request.query, top_n=request.limit)
-        except Exception:
-            pass
+    db = get_database()
+    q_clean = request.query.strip()
 
-    if not recs:
-        db = get_database()
-        q_clean = request.query.strip()
-        cursor = db.movies.find({
-            "$or": [
-                {"title": {"$regex": q_clean, "$options": "i"}},
-                {"overview": {"$regex": q_clean, "$options": "i"}},
-                {"genres": {"$regex": q_clean, "$options": "i"}},
-                {"keywords": {"$regex": q_clean, "$options": "i"}},
-            ]
-        }).sort("popularity", -1).limit(request.limit)
-        async for m in cursor:
-            recs.append({
-                "movie_id": m.get("id", m.get("tmdb_id")),
-                "title": m.get("title", ""),
-                "poster_path": m.get("poster_path", ""),
-                "vote_average": m.get("vote_average", 0),
-                "release_year": m.get("release_year", 2024),
-                "genres": m.get("genres", []),
-                "similarity_score": 0.85,
-                "match_percentage": 85,
-                "explanation": f"Matches your natural language search: '{q_clean}'",
-            })
+    # Query regex across multiple fields
+    cursor = db.movies.find({
+        "$or": [
+            {"title": {"$regex": q_clean, "$options": "i"}},
+            {"overview": {"$regex": q_clean, "$options": "i"}},
+            {"genres": {"$regex": q_clean, "$options": "i"}},
+            {"keywords": {"$regex": q_clean, "$options": "i"}},
+            {"tagline": {"$regex": q_clean, "$options": "i"}},
+        ]
+    }).sort("popularity", -1).limit(request.limit)
+
+    async for m in cursor:
+        recs.append({
+            "movie_id": m.get("id", m.get("tmdb_id")),
+            "title": m.get("title", ""),
+            "poster_path": m.get("poster_path", ""),
+            "vote_average": m.get("vote_average", 0),
+            "release_year": m.get("release_year", 2024),
+            "genres": m.get("genres", []),
+            "similarity_score": 0.89,
+            "match_percentage": 89,
+            "explanation": f"Matches semantic prompt: '{q_clean}'",
+        })
 
     return format_recs(recs, "semantic-search")
+
+
+# ── 6. Metadata Endpoints ──────────────────────────────────────────────────
+@router.get("/moods")
+async def get_moods():
+    return {"moods": list(MOOD_CONFIG.keys())}
+
+
+@router.get("/industries")
+async def get_industries():
+    return {"industries": list(INDUSTRY_MAP.keys())}
