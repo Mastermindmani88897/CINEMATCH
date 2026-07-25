@@ -5,7 +5,17 @@ import type {
   RatingResponse, ReviewResponse, NoteResponse
 } from '../types';
 
-const RAW_API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+function getRawApiUrl(): string {
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
+  }
+  if (import.meta.env.PROD) {
+    return 'https://cinematch-backend-okio.onrender.com';
+  }
+  return 'http://localhost:8000';
+}
+
+const RAW_API_URL = getRawApiUrl();
 const API_BASE_URL = RAW_API_URL.endsWith('/api') ? RAW_API_URL : `${RAW_API_URL.replace(/\/$/, '')}/api`;
 
 export const api = axios.create({

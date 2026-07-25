@@ -1,6 +1,7 @@
 from pydantic_settings import BaseSettings
+from pydantic import ConfigDict
 from functools import lru_cache
-from typing import Optional
+from typing import Optional, List
 
 
 class Settings(BaseSettings):
@@ -42,8 +43,9 @@ class Settings(BaseSettings):
     EMAILS_FROM_NAME: str = "CineMatch AI"
     EMAILS_FROM_EMAIL: str = "noreply@cinematch.ai"
 
-    # Frontend Integration
+    # Frontend Integration & CORS
     FRONTEND_URL: str = "http://localhost:5173"
+    CORS_ORIGINS: str = "http://localhost:5173,http://localhost:3000,https://cinematch-web.vercel.app"
 
     # Rate Limiting
     RATE_LIMIT_PER_MINUTE: int = 60
@@ -55,10 +57,7 @@ class Settings(BaseSettings):
     # Redis Cache Configuration
     REDIS_URL: Optional[str] = None
 
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        extra = "ignore"
+    model_config = ConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
 
 @lru_cache()
