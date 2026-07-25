@@ -5,7 +5,7 @@ import { MovieCard } from '../components/common/MovieCard';
 import { MovieGridSkeleton } from '../components/common/Skeleton';
 import { searchApi, recApi, movieApi } from '../api/client';
 import type { Movie, RecommendationItem } from '../types';
-import { FunnelIcon, SparklesIcon } from '@heroicons/react/24/outline';
+import { FunnelIcon, SparklesIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
 
 export const SearchPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -14,13 +14,20 @@ export const SearchPage: React.FC = () => {
   const [movies, setMovies] = useState<Movie[]>([]);
   const [semanticResults, setSemanticResults] = useState<RecommendationItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [genres, setGenres] = useState<string[]>([]);
+  
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
 
   const [selectedGenre, setSelectedGenre] = useState('');
   const [selectedYear, setSelectedYear] = useState('');
   const [selectedLanguage, setSelectedLanguage] = useState(searchParams.get('language') || '');
   const [minRating, setMinRating] = useState('0');
   const [sortBy, setSortBy] = useState('popularity');
+
+  const query = searchParams.get('q') || '';
 
   useEffect(() => {
     movieApi.getGenres().then(setGenres).catch(console.error);
@@ -34,19 +41,28 @@ export const SearchPage: React.FC = () => {
   }, [searchParams]);
 
   useEffect(() => {
-    const q = searchParams.get('q') || '';
-    executeSearch(q);
-  }, [searchParams, selectedGenre, selectedYear, selectedLanguage, minRating, sortBy, isSemantic]);
+    setPage(1);
+    executeSearch(query, 1, false);
+  }, [query, selectedGenre, selectedYear, selectedLanguage, minRating, sortBy, isSemantic]);
 
-  const executeSearch = async (searchQuery: string) => {
-    setLoading(true);
+  const executeSearch = async (searchQuery: string, pageNum: number, append: boolean) => {
+    if (append) {
+      setLoadingMore(true);
+    } else {
+      setLoading(true);
+    }
+
     try {
       if (isSemantic && searchQuery.trim()) {
         const res = await recApi.postSemanticSearch(searchQuery, 20);
         setSemanticResults(res.recommendations);
         setMovies([]);
+        setTotal(res.total);
+        setTotalPages(1);
       } else {
         const params: any = {
+          page: pageNum,
+          per_page: 20,
           sort: sortBy,
           min_rating: parseFloat(minRating),
         };
@@ -58,13 +74,33 @@ export const SearchPage: React.FC = () => {
           ? await searchApi.search(searchQuery, params)
           : await movieApi.getMovies(params);
 
-        setMovies(res.items);
+        if (append) {
+          setMovies((prev) => {
+            const existingIds = new Set(prev.map((m) => m.id));
+            const newUnique = res.items.filter((m) => !existingIds.has(m.id));
+            return [...prev, ...newUnique];
+          });
+        } else {
+          setMovies(res.items);
+        }
+
         setSemanticResults([]);
+        setTotal(res.total);
+        setTotalPages(res.pages);
       }
     } catch (err) {
       console.error('Search failed', err);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
+    }
+  };
+
+  const handleLoadMore = () => {
+    if (page < totalPages && !loadingMore) {
+      const nextPage = page + 1;
+      setPage(nextPage);
+      executeSearch(query, nextPage, true);
     }
   };
 
@@ -80,7 +116,7 @@ export const SearchPage: React.FC = () => {
         </h1>
         <SearchBar
           autoFocus
-          placeholder={isSemantic ? 'Ask AI e.g. "movies about artificial intelligence and space"' : 'Search title, overview, cast, director...'}
+          placeholder={isSemantic ? 'Ask AI e.g. "movies about space travel or futuristic technology"' : 'Search title, director, cast, Tollywood, Bollywood...'}
           onSearchSubmit={handleSearchSubmit}
         />
 
@@ -172,6 +208,13 @@ export const SearchPage: React.FC = () => {
         </div>
       </div>
 
+      {total > 0 && (
+        <div className="flex justify-between items-center text-xs text-gray-400 px-1 font-semibold">
+          <span>Found <strong className="text-white">{total.toLocaleString()}</strong> movies</span>
+          <span>Showing {movies.length} of {total.toLocaleString()}</span>
+        </div>
+      )}
+
       {loading ? (
         <MovieGridSkeleton count={10} />
       ) : isSemantic && semanticResults.length > 0 ? (
@@ -199,10 +242,31 @@ export const SearchPage: React.FC = () => {
           </div>
         </div>
       ) : movies.length > 0 ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 sm:gap-6">
-          {movies.map((movie) => (
-            <MovieCard key={movie.id} movie={movie} />
-          ))}
+        <div className="space-y-8">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 sm:gap-6">
+            {movies.map((movie) => (
+              <MovieCard key={movie.id} movie={movie} />
+            ))}
+          </div>
+
+          {page < totalPages && (
+            <div className="flex justify-center pt-6">
+              <button
+                onClick={handleLoadMore}
+                disabled={loadingMore}
+                className="btn-secondary px-8 py-3 rounded-full font-bold text-sm flex items-center gap-2 shadow-xl hover:scale-105 transition-all"
+              >
+                {loadingMore ? (
+                  <>
+                    <ArrowPathIcon className="w-5 h-5 animate-spin" />
+                    Loading More Movies...
+                  </>
+                ) : (
+                  `Load More (${total - movies.length} Remaining)`
+                )}
+              </button>
+            </div>
+          )}
         </div>
       ) : (
         <div className="text-center py-20 space-y-4">

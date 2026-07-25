@@ -22,6 +22,25 @@ TMDB_GENRES_MAP = {
     10770: "TV Movie", 53: "Thriller", 10752: "War", 37: "Western"
 }
 
+INDUSTRY_LANG_MAP = {
+    "tollywood": "te",
+    "bollywood": "hi",
+    "kollywood": "ta",
+    "mollywood": "ml",
+    "sandalwood": "kn",
+    "korean": "ko",
+    "japanese": "ja",
+    "anime": "ja",
+    "chinese": "zh",
+    "hollywood": "en",
+    "telugu": "te",
+    "hindi": "hi",
+    "tamil": "ta",
+    "malayalam": "ml",
+    "kannada": "kn",
+    "english": "en",
+}
+
 
 def map_tmdb_to_list_response(item: dict) -> dict:
     tmdb_id = item.get("id") or 1
@@ -80,6 +99,7 @@ async def list_movies(
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
     genre: Optional[str] = None,
+    industry: Optional[str] = None,
     year: Optional[int] = None,
     language: Optional[str] = None,
     country: Optional[str] = None,
@@ -90,11 +110,19 @@ async def list_movies(
     try:
         db = get_database()
         query = {}
-        if genre:
+
+        # Handle Industry / Language aliasing
+        target_ind = (industry or language or genre or "").lower().strip()
+        if target_ind in INDUSTRY_LANG_MAP:
+            query["original_language"] = INDUSTRY_LANG_MAP[target_ind]
+            if target_ind == "anime":
+                query["genres"] = "Animation"
+        elif genre and genre.lower().strip() not in INDUSTRY_LANG_MAP:
             query["genres"] = genre
+
         if year:
             query["release_year"] = year
-        if language:
+        if language and language.lower().strip() not in INDUSTRY_LANG_MAP and "original_language" not in query:
             query["original_language"] = language
         if country:
             query["origin_country"] = country
@@ -202,85 +230,35 @@ async def get_top_rated(
     return [MovieListResponse.model_validate(map_tmdb_to_list_response(m)) for m in results[:limit]]
 
 
-@router.get("/upcoming", response_model=List[MovieListResponse])
-async def get_upcoming(limit: int = Query(20, le=50)):
-    try:
-        db = get_database()
-        current_year = datetime.now().year
-        cursor = (
-            db.movies.find({"release_year": {"$gte": current_year - 1}})
-            .sort("popularity", -1)
-            .limit(limit)
-        )
-        movies = [serialize_doc(m) async for m in cursor]
-        if movies:
-            return [MovieListResponse.model_validate(m) for m in movies]
-    except Exception as e:
-        logger.warning(f"MongoDB query failed in get_upcoming ({e}). Falling back to TMDB API...")
-
-    tmdb_data = await tmdb_service.get_upcoming_movies(page=1)
-    results = tmdb_data.get("results", [])
-    return [MovieListResponse.model_validate(map_tmdb_to_list_response(m)) for m in results[:limit]]
-
-
-@router.get("/genres")
+@router.get("/genres", response_model=List[str])
 async def get_genres():
     try:
         db = get_database()
         genres = await db.movies.distinct("genres")
         if genres:
-            return sorted([g for g in genres if g])
-    except Exception as e:
-        logger.warning(f"MongoDB query failed in get_genres ({e}). Returning default genres...")
-
+            return sorted([g for g in genres if g and isinstance(g, str)])
+    except Exception:
+        pass
     return sorted(list(set(TMDB_GENRES_MAP.values())))
-
-
-@router.get("/discover", response_model=PaginatedMovies)
-async def discover_movies(
-    page: int = Query(1, ge=1),
-    per_page: int = Query(20, ge=1, le=100),
-    genre: Optional[str] = None,
-    year: Optional[int] = None,
-    language: Optional[str] = None,
-    country: Optional[str] = None,
-    min_rating: float = Query(0, ge=0, le=10),
-    sort: str = Query("popularity", pattern="^(popularity|vote_average|release_year|weighted_rating)$"),
-    order: str = Query("desc", pattern="^(asc|desc)$"),
-):
-    return await list_movies(
-        page=page,
-        per_page=per_page,
-        genre=genre,
-        year=year,
-        language=language,
-        country=country,
-        min_rating=min_rating,
-        sort=sort,
-        order=order,
-    )
 
 
 @router.get("/{movie_id}", response_model=MovieResponse)
 async def get_movie(movie_id: int):
-    try:
-        db = get_database()
-        # 1. Primary lookup by internal ID
-        movie = await db.movies.find_one({"id": movie_id})
-        # 2. Secondary lookup by TMDB ID if internal ID not found
-        if not movie:
-            movie = await db.movies.find_one({"tmdb_id": movie_id})
-        if movie:
-            return MovieResponse.model_validate(serialize_doc(movie))
-    except Exception as e:
-        logger.warning(f"MongoDB query failed in get_movie ({e}). Falling back to TMDB API...")
+    db = get_database()
+    movie = await db.movies.find_one({"id": movie_id})
 
-    # Fetch from TMDB API
+    if not movie:
+        movie = await db.movies.find_one({"tmdb_id": movie_id})
+
+    if movie:
+        return MovieResponse.model_validate(serialize_doc(movie))
+
     try:
-        tmdb_item = await tmdb_service.get_movie_details(movie_id)
-        if tmdb_item:
-            return MovieResponse.model_validate(map_tmdb_to_detail_response(tmdb_item))
-    except Exception:
-        pass
+        tmdb_data = await tmdb_service.get_movie_details(movie_id)
+        if tmdb_data and "id" in tmdb_data:
+            detail = map_tmdb_to_detail_response(tmdb_data)
+            return MovieResponse.model_validate(detail)
+    except Exception as e:
+        logger.warning(f"TMDB detail lookup failed for {movie_id}: {e}")
 
     raise HTTPException(status_code=404, detail="Movie not found")

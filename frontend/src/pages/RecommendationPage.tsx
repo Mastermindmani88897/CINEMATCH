@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { SparklesIcon, FireIcon, HeartIcon, FilmIcon, UserIcon, AdjustmentsHorizontalIcon } from '@heroicons/react/24/outline';
+import { SparklesIcon, FireIcon, HeartIcon, FilmIcon, UserIcon, AdjustmentsHorizontalIcon, GlobeAsiaAustraliaIcon } from '@heroicons/react/24/outline';
 import { recApi, movieApi } from '../api/client';
 import type { RecommendationItem, Movie } from '../types';
 import { RecommendationCard } from '../components/common/RecommendationCard';
 import { RecommendationCardSkeleton } from '../components/common/Skeleton';
 import { useAuthStore } from '../store/authStore';
 
-type AlgoType = 'mood' | 'genre' | 'popularity' | 'semantic' | 'personalized' | 'content';
+type AlgoType = 'mood' | 'industry' | 'genre' | 'popularity' | 'semantic' | 'personalized' | 'content';
 
 export const RecommendationPage: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -16,6 +16,7 @@ export const RecommendationPage: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<AlgoType>(paramMovieId ? 'content' : (initialMood ? 'mood' : 'popularity'));
   const [selectedMood, setSelectedMood] = useState(initialMood);
+  const [selectedIndustry, setSelectedIndustry] = useState('tollywood');
   const [selectedGenres, setSelectedGenres] = useState<string[]>(['Action']);
   const [semanticQuery, setSemanticQuery] = useState('emotional sci-fi space movies');
   const [seedMovieId, setSeedMovieId] = useState<number>(paramMovieId ? parseInt(paramMovieId) : 1);
@@ -37,7 +38,7 @@ export const RecommendationPage: React.FC = () => {
 
   useEffect(() => {
     fetchRecommendations();
-  }, [activeTab, selectedMood, selectedGenres, seedMovieId]);
+  }, [activeTab, selectedMood, selectedIndustry, selectedGenres, seedMovieId]);
 
   const fetchRecommendations = async () => {
     setLoading(true);
@@ -45,6 +46,8 @@ export const RecommendationPage: React.FC = () => {
       let res;
       if (activeTab === 'mood') {
         res = await recApi.getMoodRecs(selectedMood);
+      } else if (activeTab === 'industry') {
+        res = await recApi.getMoodRecs(selectedIndustry);
       } else if (activeTab === 'genre') {
         res = await recApi.getGenreRecs(selectedGenres.join(','));
       } else if (activeTab === 'popularity') {
@@ -86,6 +89,7 @@ export const RecommendationPage: React.FC = () => {
       {/* Tabs */}
       <div className="flex flex-wrap items-center justify-center gap-2 border-b border-[var(--color-border)] pb-4">
         {[
+          { id: 'industry', label: 'By Industry / Region', icon: GlobeAsiaAustraliaIcon },
           { id: 'mood', label: 'Mood Based', icon: HeartIcon },
           { id: 'genre', label: 'Genre Based', icon: FilmIcon },
           { id: 'content', label: 'Similar Movie', icon: AdjustmentsHorizontalIcon },
@@ -113,6 +117,34 @@ export const RecommendationPage: React.FC = () => {
 
       {/* Filter Controls */}
       <div className="card p-6 max-w-4xl mx-auto">
+        {activeTab === 'industry' && (
+          <div className="space-y-4">
+            <h3 className="font-bold text-white text-sm">Select Industry / Regional Cinema:</h3>
+            <div className="flex flex-wrap gap-3">
+              {[
+                { id: 'tollywood', name: 'Tollywood (Telugu)' },
+                { id: 'bollywood', name: 'Bollywood (Hindi)' },
+                { id: 'kollywood', name: 'Kollywood (Tamil)' },
+                { id: 'mollywood', name: 'Mollywood (Malayalam)' },
+                { id: 'sandalwood', name: 'Sandalwood (Kannada)' },
+                { id: 'korean', name: 'Korean Cinema' },
+                { id: 'anime', name: 'Anime' },
+                { id: 'japanese', name: 'Japanese' },
+                { id: 'chinese', name: 'Chinese' },
+                { id: 'hollywood', name: 'Hollywood (English)' },
+              ].map((ind) => (
+                <button
+                  key={ind.id}
+                  onClick={() => setSelectedIndustry(ind.id)}
+                  className={`genre-pill text-xs capitalize ${selectedIndustry === ind.id ? 'active' : ''}`}
+                >
+                  {ind.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {activeTab === 'mood' && (
           <div className="space-y-4">
             <h3 className="font-bold text-white text-sm">Select Mood:</h3>

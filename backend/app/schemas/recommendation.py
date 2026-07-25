@@ -23,6 +23,7 @@ class RecommendationResponse(BaseModel):
 class SemanticSearchRequest(BaseModel):
     query: str
     top_k: int = 20
+    limit: int = 20
 
 
 class MoodRecommendationRequest(BaseModel):
