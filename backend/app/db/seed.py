@@ -134,39 +134,54 @@ SAMPLE_MOVIES = [
 
 
 async def seed():
-    logger.info(f"Connecting to MongoDB: {settings.MONGODB_URI[:25]}...")
-    client = AsyncIOMotorClient(settings.MONGODB_URI)
-    db = client[settings.DATABASE_NAME]
+    from app.core.database import init_db, get_database
+    logger.info("Initializing database connection for seeding...")
+    await init_db()
+    db = get_database()
+    if db is None:
+        logger.error("Could not obtain database connection for seeding.")
+        return
 
-    # Seed Admin User
-    admin = await db.users.find_one({"email": "admin@cinematch.ai"})
-    if not admin:
-        admin_doc = {
-            "id": 1,
-            "email": "admin@cinematch.ai",
-            "username": "admin",
-            "full_name": "CineMatch Admin",
-            "hashed_password": hash_password("AdminPass123!"),
-            "avatar_url": None,
-            "bio": "System Admin",
-            "is_active": True,
-            "is_admin": True,
-            "is_verified": True,
-            "created_at": datetime.now(timezone.utc),
-            "updated_at": datetime.now(timezone.utc),
-        }
-        await db.users.insert_one(admin_doc)
-        logger.info("Seeded admin user: admin@cinematch.ai / AdminPass123! ✓")
+    try:
+        # Seed Admin User
+        admin = await db.users.find_one({"email": "admin@cinematch.ai"})
+        if not admin:
+            admin_doc = {
+                "id": 1,
+                "email": "admin@cinematch.ai",
+                "username": "admin",
+                "full_name": "CineMatch Admin",
+                "hashed_password": hash_password("AdminPass123!"),
+                "avatar_url": None,
+                "bio": "System Admin",
+                "is_active": True,
+                "is_admin": True,
+                "is_verified": True,
+                "created_at": datetime.now(timezone.utc),
+                "updated_at": datetime.now(timezone.utc),
+            }
+            await db.users.insert_one(admin_doc)
+            logger.info("Seeded admin user: admin@cinematch.ai / AdminPass123! ✓")
 
-    # Seed Sample Movies
-    for mdata in SAMPLE_MOVIES:
-        existing = await db.movies.find_one({"id": mdata["id"]})
-        if not existing:
-            await db.movies.insert_one(mdata)
-            logger.info(f"Seeded movie into MongoDB: {mdata['title']} ✓")
+        # Seed Sample Movies fallback
+        for mdata in SAMPLE_MOVIES:
+            existing = await db.movies.find_one({"id": mdata["id"]})
+            if not existing:
+                await db.movies.insert_one(mdata)
+                logger.info(f"Seeded sample movie into MongoDB: {mdata['title']} ✓")
 
-    client.close()
-    logger.info("MongoDB seed completed successfully ✓")
+        # Trigger live multi-industry TMDB sync
+        try:
+            from app.services.tmdb_sync import sync_tmdb_movies
+            logger.info("Triggering live multi-industry TMDB movie import...")
+            result = await sync_tmdb_movies(max_pages_per_lang=3)
+            logger.info(f"Seeding & Sync Result: {result}")
+        except Exception as sync_err:
+            logger.warning(f"Live TMDB sync notice: {sync_err}")
+
+        logger.info("MongoDB seed completed successfully ✓")
+    except Exception as e:
+        logger.error(f"Seeding completed with warning: {e}")
 
 
 if __name__ == "__main__":

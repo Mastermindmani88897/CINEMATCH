@@ -21,6 +21,7 @@ export const MovieDetailPage: React.FC = () => {
   const [userRating, setUserRating] = useState(0);
   const [newReview, setNewReview] = useState('');
   const [loading, setLoading] = useState(true);
+  const [isError, setIsError] = useState(false);
 
   const { openTrailer, favoriteIds, watchlistIds, toggleFavoriteId, toggleWatchlistId } = useMovieStore();
   const { isAuthenticated } = useAuthStore();
@@ -33,6 +34,7 @@ export const MovieDetailPage: React.FC = () => {
     if (!movieId) return;
     const fetchMovieData = async () => {
       setLoading(true);
+      setIsError(false);
       try {
         const data = await movieApi.getMovieById(movieId);
         setMovie(data);
@@ -46,6 +48,7 @@ export const MovieDetailPage: React.FC = () => {
         }
       } catch (err) {
         console.error('Failed to load movie', err);
+        setIsError(true);
       } finally {
         setLoading(false);
       }
@@ -53,7 +56,7 @@ export const MovieDetailPage: React.FC = () => {
     fetchMovieData();
   }, [movieId, isAuthenticated]);
 
-  if (loading || !movie) {
+  if (loading) {
     return (
       <div className="max-w-7xl mx-auto px-4 py-20 text-center">
         <div className="skeleton h-96 w-full rounded-3xl" />
@@ -61,9 +64,22 @@ export const MovieDetailPage: React.FC = () => {
     );
   }
 
+  if (isError || !movie) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 py-20 text-center space-y-6">
+        <div className="text-6xl">🎬</div>
+        <h1 className="text-3xl font-black text-white font-['Outfit']">Movie Not Found</h1>
+        <p className="text-gray-400">The movie you're looking for doesn't exist or was removed.</p>
+        <button onClick={() => navigate(-1)} className="btn-primary">← Go Back</button>
+      </div>
+    );
+  }
+
+  const POSTER_FALLBACK = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='500' height='750' viewBox='0 0 500 750'%3E%3Crect width='500' height='750' fill='%231a1a26'/%3E%3Ctext x='250' y='375' font-family='Inter,sans-serif' font-size='24' fill='%235a5a72' text-anchor='middle' dominant-baseline='middle'%3E🎬 No Poster%3C/text%3E%3C/svg%3E";
+
   const posterUrl = movie.poster_path
     ? (movie.poster_path.startsWith('http') ? movie.poster_path : `https://image.tmdb.org/t/p/w500${movie.poster_path}`)
-    : 'https://via.placeholder.com/500x750?text=No+Poster';
+    : POSTER_FALLBACK;
 
   const backdropUrl = movie.backdrop_path
     ? (movie.backdrop_path.startsWith('http') ? movie.backdrop_path : `https://image.tmdb.org/t/p/original${movie.backdrop_path}`)

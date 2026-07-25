@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, field_validator
+from pydantic import BaseModel, EmailStr, field_validator, ConfigDict
 from typing import Optional
 from datetime import datetime
 import re
@@ -38,25 +38,23 @@ class UserResponse(BaseModel):
     id: int
     email: str
     username: str
-    full_name: Optional[str]
-    avatar_url: Optional[str]
-    bio: Optional[str]
+    full_name: Optional[str] = None
+    avatar_url: Optional[str] = None
+    bio: Optional[str] = None
     is_admin: bool
     is_verified: bool
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class UserPublic(BaseModel):
     id: int
     username: str
-    full_name: Optional[str]
-    avatar_url: Optional[str]
+    full_name: Optional[str] = None
+    avatar_url: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class LoginRequest(BaseModel):

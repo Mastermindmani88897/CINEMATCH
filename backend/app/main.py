@@ -2,6 +2,12 @@
 CineMatch AI — FastAPI Application Entry Point (MongoDB Atlas Engine)
 """
 
+import sys
+from pathlib import Path
+root_dir = Path(__file__).resolve().parent.parent.parent
+if str(root_dir) not in sys.path:
+    sys.path.insert(0, str(root_dir))
+
 from contextlib import asynccontextmanager
 import logging
 import asyncio
@@ -9,13 +15,13 @@ import asyncio
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.exceptions import RequestValidationError
 
 from app.core.config import settings
-from app.core.database import init_db, close_db
-from app.core.validate import run_startup_validation
-from app.api import auth, movies, recommendations, search, users, analytics, admin
+from app.core.database import init_db, close_db, seed_initial_movies
+from app.core.validate import run_startup_validation, enforce_startup_validation
+from app.api import auth, movies, recommendations, search, users, analytics, admin, tmdb, community
 from app.services.tmdb_sync import schedule_daily_sync
 
 logging.basicConfig(
@@ -27,18 +33,23 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifespan — startup & shutdown for MongoDB Atlas."""
+    """Application lifespan — startup & shutdown validation and initialization."""
     logger.info("═════════════════════════════════════════════════")
     logger.info("   CineMatch AI Backend Starting (MongoDB Atlas)  ")
     logger.info("═════════════════════════════════════════════════")
 
-    # Connect to MongoDB Atlas & create indexes
+    # 1. Enforce Startup Validation (Stops startup if required env vars are missing)
+    await enforce_startup_validation()
+
+    # 2. Connect to MongoDB Atlas & create indexes
     await init_db()
+    await seed_initial_movies()
 
-    # Run Startup Validation
-    await run_startup_validation()
+    # 3. Log Startup Health Status
+    health_status = await run_startup_validation()
+    logger.info(f"Startup Health Status: {health_status['status']}")
 
-    # Load ML engines in background
+    # 4. Load ML engines in background
     try:
         from ml.pipeline.hybrid_engine import hybrid_engine
         import concurrent.futures
@@ -49,7 +60,7 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"ML engines not loaded (run ml/train.py first): {e}")
 
-    # Start 24h TMDB sync task
+    # 5. Start 24h TMDB sync task
     sync_task = asyncio.create_task(schedule_daily_sync())
 
     yield
@@ -71,13 +82,23 @@ app = FastAPI(
 
 # ── Middleware ─────────────────────────────────────────────────────────────
 app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+allowed_origins = list({
+    settings.FRONTEND_URL,
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+})
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.FRONTEND_URL, "http://localhost:5173", "http://localhost:3000"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 # ── Exception Handlers ─────────────────────────────────────────────────────
 @app.exception_handler(RequestValidationError)
@@ -96,6 +117,7 @@ async def global_exception_handler(request: Request, exc: Exception):
         content={"detail": "Internal server error"},
     )
 
+
 # ── Routers ────────────────────────────────────────────────────────────────
 PREFIX = "/api"
 app.include_router(auth.router, prefix=PREFIX)
@@ -105,13 +127,22 @@ app.include_router(search.router, prefix=PREFIX)
 app.include_router(users.router, prefix=PREFIX)
 app.include_router(analytics.router, prefix=PREFIX)
 app.include_router(admin.router, prefix=PREFIX)
+app.include_router(tmdb.router, prefix=PREFIX)
+app.include_router(community.router, prefix=PREFIX)
 
 
 # ── Health Endpoint ────────────────────────────────────────────────────────
 @app.get("/health", tags=["Health"])
+@app.get("/api/health", tags=["Health"], include_in_schema=False)
 async def health_check():
-    """Detailed health check reporting MongoDB, ML Engine, TMDB API, and Gemini API status."""
+    """Detailed health check reporting MongoDB, TMDB API, Gemini API, JWT, and Env Status."""
     return await run_startup_validation()
+
+
+@app.get("/docs", include_in_schema=False)
+async def redirect_docs():
+    """Redirect /docs to API documentation."""
+    return RedirectResponse(url="/api/docs")
 
 
 @app.get("/", tags=["Root"])
@@ -122,3 +153,4 @@ async def root():
         "version": settings.APP_VERSION,
         "docs": "/api/docs",
     }
+

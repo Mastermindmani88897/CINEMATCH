@@ -199,3 +199,8 @@ async def change_password(
         {"$set": {"hashed_password": hash_password(data.new_password)}}
     )
     return {"message": "Password changed successfully"}
+
+
+@router.post("/logout")
+async def logout():
+    return {"message": "Successfully logged out"}

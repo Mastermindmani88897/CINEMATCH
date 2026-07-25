@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { SparklesIcon, FireIcon, HeartIcon, FilmIcon, UserIcon } from '@heroicons/react/24/outline';
+import { SparklesIcon, FireIcon, HeartIcon, FilmIcon, UserIcon, AdjustmentsHorizontalIcon } from '@heroicons/react/24/outline';
 import { recApi, movieApi } from '../api/client';
-import type { RecommendationItem } from '../types';
+import type { RecommendationItem, Movie } from '../types';
 import { RecommendationCard } from '../components/common/RecommendationCard';
 import { RecommendationCardSkeleton } from '../components/common/Skeleton';
 import { useAuthStore } from '../store/authStore';
@@ -12,12 +12,14 @@ type AlgoType = 'mood' | 'genre' | 'popularity' | 'semantic' | 'personalized' | 
 export const RecommendationPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const initialMood = searchParams.get('mood') || 'happy';
+  const paramMovieId = searchParams.get('movieId');
 
-  const [activeTab, setActiveTab] = useState<AlgoType>(initialMood ? 'mood' : 'popularity');
+  const [activeTab, setActiveTab] = useState<AlgoType>(paramMovieId ? 'content' : (initialMood ? 'mood' : 'popularity'));
   const [selectedMood, setSelectedMood] = useState(initialMood);
   const [selectedGenres, setSelectedGenres] = useState<string[]>(['Action']);
   const [semanticQuery, setSemanticQuery] = useState('emotional sci-fi space movies');
-  const seedMovieId = 1;
+  const [seedMovieId, setSeedMovieId] = useState<number>(paramMovieId ? parseInt(paramMovieId) : 1);
+  const [popularSeedMovies, setPopularSeedMovies] = useState<Movie[]>([]);
   const [results, setResults] = useState<RecommendationItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [allGenres, setAllGenres] = useState<string[]>([]);
@@ -25,6 +27,12 @@ export const RecommendationPage: React.FC = () => {
 
   useEffect(() => {
     movieApi.getGenres().then(setAllGenres).catch(console.error);
+    movieApi.getPopular(10).then((pop) => {
+      setPopularSeedMovies(pop);
+      if (!paramMovieId && pop.length > 0) {
+        setSeedMovieId(pop[0].id);
+      }
+    }).catch(console.error);
   }, []);
 
   useEffect(() => {
@@ -71,14 +79,16 @@ export const RecommendationPage: React.FC = () => {
           AI Recommendation Center
         </h1>
         <p className="text-gray-400 text-sm sm:text-base">
-          Choose from 6 specialized recommendation algorithms powered by TF-IDF, Cosine Similarity, and Sentence Transformers.
+          Choose from specialized recommendation algorithms powered by TF-IDF, Cosine Similarity, and Sentence Transformers.
         </p>
       </div>
 
+      {/* Tabs */}
       <div className="flex flex-wrap items-center justify-center gap-2 border-b border-[var(--color-border)] pb-4">
         {[
           { id: 'mood', label: 'Mood Based', icon: HeartIcon },
           { id: 'genre', label: 'Genre Based', icon: FilmIcon },
+          { id: 'content', label: 'Similar Movie', icon: AdjustmentsHorizontalIcon },
           { id: 'popularity', label: 'Popularity & Rating', icon: FireIcon },
           { id: 'semantic', label: 'Semantic AI Search', icon: SparklesIcon },
           { id: 'personalized', label: 'Personalized Taste', icon: UserIcon },
@@ -101,6 +111,7 @@ export const RecommendationPage: React.FC = () => {
         })}
       </div>
 
+      {/* Filter Controls */}
       <div className="card p-6 max-w-4xl mx-auto">
         {activeTab === 'mood' && (
           <div className="space-y-4">
@@ -142,6 +153,23 @@ export const RecommendationPage: React.FC = () => {
           </div>
         )}
 
+        {activeTab === 'content' && (
+          <div className="space-y-4">
+            <h3 className="font-bold text-white text-sm">Select Base Movie for Similarity:</h3>
+            <select
+              value={seedMovieId}
+              onChange={(e) => setSeedMovieId(parseInt(e.target.value))}
+              className="input text-xs py-2 px-3 bg-[var(--color-surface-2)]"
+            >
+              {popularSeedMovies.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.title} ({m.release_year})
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
         {activeTab === 'semantic' && (
           <form onSubmit={handleSemanticSubmit} className="flex gap-3">
             <input
@@ -164,6 +192,7 @@ export const RecommendationPage: React.FC = () => {
         )}
       </div>
 
+      {/* Results */}
       <div className="max-w-4xl mx-auto space-y-4">
         {loading ? (
           Array.from({ length: 5 }).map((_, i) => <RecommendationCardSkeleton key={i} />)

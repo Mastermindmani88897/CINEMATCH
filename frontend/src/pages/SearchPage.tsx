@@ -18,6 +18,7 @@ export const SearchPage: React.FC = () => {
 
   const [selectedGenre, setSelectedGenre] = useState('');
   const [selectedYear, setSelectedYear] = useState('');
+  const [selectedLanguage, setSelectedLanguage] = useState(searchParams.get('language') || '');
   const [minRating, setMinRating] = useState('0');
   const [sortBy, setSortBy] = useState('popularity');
 
@@ -26,9 +27,16 @@ export const SearchPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    const langFromUrl = searchParams.get('language');
+    if (langFromUrl !== null && langFromUrl !== selectedLanguage) {
+      setSelectedLanguage(langFromUrl);
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
     const q = searchParams.get('q') || '';
     executeSearch(q);
-  }, [searchParams, selectedGenre, selectedYear, minRating, sortBy, isSemantic]);
+  }, [searchParams, selectedGenre, selectedYear, selectedLanguage, minRating, sortBy, isSemantic]);
 
   const executeSearch = async (searchQuery: string) => {
     setLoading(true);
@@ -44,6 +52,7 @@ export const SearchPage: React.FC = () => {
         };
         if (selectedGenre) params.genre = selectedGenre;
         if (selectedYear) params.year = parseInt(selectedYear);
+        if (selectedLanguage) params.language = selectedLanguage;
 
         const res = searchQuery.trim()
           ? await searchApi.search(searchQuery, params)
@@ -110,6 +119,25 @@ export const SearchPage: React.FC = () => {
           </select>
 
           <select
+            value={selectedLanguage}
+            onChange={(e) => setSelectedLanguage(e.target.value)}
+            className="input text-xs py-2 px-3 w-auto bg-[var(--color-surface-2)]"
+          >
+            <option value="">All Languages / Industries</option>
+            <option value="en">Hollywood (English)</option>
+            <option value="hi">Bollywood (Hindi)</option>
+            <option value="te">Tollywood (Telugu)</option>
+            <option value="ta">Kollywood (Tamil)</option>
+            <option value="ml">Mollywood (Malayalam)</option>
+            <option value="kn">Sandalwood (Kannada)</option>
+            <option value="ko">Korean Cinema</option>
+            <option value="ja">Anime / Japanese</option>
+            <option value="zh">Chinese Cinema</option>
+            <option value="es">Spanish Cinema</option>
+            <option value="fr">French Cinema</option>
+          </select>
+
+          <select
             value={selectedYear}
             onChange={(e) => setSelectedYear(e.target.value)}
             className="input text-xs py-2 px-3 w-auto bg-[var(--color-surface-2)]"
@@ -152,7 +180,15 @@ export const SearchPage: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {semanticResults.map((item) => (
               <div key={item.movie_id} className="card p-4 flex gap-4">
-                <img src={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : 'https://via.placeholder.com/150'} alt={item.title} className="w-24 aspect-[2/3] object-cover rounded-lg" />
+                <img
+                  src={
+                    item.poster_path
+                      ? `https://image.tmdb.org/t/p/w500${item.poster_path}`
+                      : "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='225' viewBox='0 0 150 225'%3E%3Crect width='150' height='225' fill='%231a1a26'/%3E%3Ctext x='75' y='112' font-family='sans-serif' font-size='32' fill='%235a5a72' text-anchor='middle' dominant-baseline='middle'%3E🎬%3C/text%3E%3C/svg%3E"
+                  }
+                  alt={item.title}
+                  className="w-24 aspect-[2/3] object-cover rounded-lg"
+                />
                 <div>
                   <h3 className="font-bold text-white text-lg">{item.title}</h3>
                   <div className="text-xs text-[var(--color-accent)] font-semibold mt-1">Match: {item.match_percentage}%</div>

@@ -6,14 +6,14 @@ from datetime import datetime, timezone
 from app.core.database import get_database
 from app.core.deps import get_current_admin
 from app.core.utils import serialize_doc
-from app.schemas.movie import MovieCreate, MovieUpdate, MovieResponse, PaginatedMovies
+from app.schemas.movie import MovieCreate, MovieUpdate, MovieResponse
 from app.schemas.user import UserResponse
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
 
 # ── User Management ───────────────────────────────────────────────────────────
-@router.get("/users", response_model=PaginatedMovies)
+@router.get("/users")
 async def list_users(
     page: int = 1,
     per_page: int = 20,
@@ -21,7 +21,7 @@ async def list_users(
 ):
     db = get_database()
     total = await db.users.count_documents({})
-    cursor = db.users.find({}).skip((page - 1) * per_page).limit(per_page)
+    cursor = db.users.find({}).sort("id", 1).skip((page - 1) * per_page).limit(per_page)
     users = [serialize_doc(u) async for u in cursor]
     return {
         "items": [UserResponse.model_validate(u) for u in users],
@@ -162,3 +162,47 @@ async def retrain_model(
 @router.get("/retrain/status")
 async def retrain_status(admin: dict = Depends(get_current_admin)):
     return _retrain_status
+
+
+@router.post("/sync-tmdb")
+async def trigger_tmdb_sync(
+    background_tasks: BackgroundTasks,
+    pages: int = Query(3, ge=1, le=10),
+    admin: dict = Depends(get_current_admin),
+):
+    """Admin endpoint to trigger multi-industry TMDB movie import and model retraining."""
+    from app.services.tmdb_sync import sync_tmdb_movies
+    background_tasks.add_task(sync_tmdb_movies, max_pages_per_lang=pages)
+    return {
+        "message": f"TMDB multi-industry synchronization started in background ({pages} pages per language)",
+        "status": "started"
+    }
+
+
+@router.get("/export/csv")
+async def export_movies_csv(admin: dict = Depends(get_current_admin)):
+    """Export movie database as CSV format."""
+    from fastapi.responses import Response
+    import csv, io
+    db = get_database()
+    movies = await db.movies.find({}).to_list(5000)
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["id", "tmdb_id", "title", "release_year", "vote_average", "popularity", "genres", "original_language"])
+    for m in movies:
+        writer.writerow([
+            m.get("id"), m.get("tmdb_id"), m.get("title"), m.get("release_year"),
+            m.get("vote_average"), m.get("popularity"), ", ".join(m.get("genres") or []),
+            m.get("original_language")
+        ])
+    return Response(content=output.getvalue(), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=cinematch_movies.csv"})
+
+
+@router.get("/export/json")
+async def export_movies_json(admin: dict = Depends(get_current_admin)):
+    """Export movie database as JSON format."""
+    from fastapi.responses import JSONResponse
+    db = get_database()
+    movies = await db.movies.find({}).to_list(5000)
+    cleaned = [serialize_doc(m) for m in movies]
+    return JSONResponse(content=cleaned, headers={"Content-Disposition": "attachment; filename=cinematch_movies.json"})

@@ -56,6 +56,15 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
+  const handleSyncTMDB = async () => {
+    try {
+      const { data } = await api.post('/admin/sync-tmdb?pages=3');
+      toast.success(data.message);
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || 'TMDB Sync trigger failed');
+    }
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -67,9 +76,15 @@ export const AdminDashboard: React.FC = () => {
           <p className="text-gray-400 text-sm">System performance, analytics, user management, and ML pipeline control</p>
         </div>
 
-        <button onClick={handleRetrain} className="btn-primary text-xs py-2 px-4">
-          <ArrowPathIcon className="w-4 h-4" /> Trigger ML Pipeline Retrain
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button onClick={handleSyncTMDB} className="btn-secondary text-xs py-2 px-4">
+            <ArrowPathIcon className="w-4 h-4 text-amber-400" /> Multi-Industry TMDB Sync
+          </button>
+
+          <button onClick={handleRetrain} className="btn-primary text-xs py-2 px-4">
+            <ArrowPathIcon className="w-4 h-4" /> Trigger ML Pipeline Retrain
+          </button>
+        </div>
       </div>
 
       {retrainStatus && (

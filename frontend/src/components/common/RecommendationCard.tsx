@@ -8,9 +8,11 @@ interface RecommendationCardProps {
 }
 
 export const RecommendationCard: React.FC<RecommendationCardProps> = ({ item }) => {
+  const POSTER_FALLBACK = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='500' height='750' viewBox='0 0 500 750'%3E%3Crect width='500' height='750' fill='%231a1a26'/%3E%3Ctext x='250' y='375' font-family='Inter,sans-serif' font-size='24' fill='%235a5a72' text-anchor='middle' dominant-baseline='middle'%3E🎬%3C/text%3E%3C/svg%3E";
+
   const posterUrl = item.poster_path
     ? (item.poster_path.startsWith('http') ? item.poster_path : `https://image.tmdb.org/t/p/w500${item.poster_path}`)
-    : 'https://via.placeholder.com/500x750?text=No+Poster';
+    : POSTER_FALLBACK;
 
   const matchClass =
     item.match_percentage >= 80 ? 'high' : item.match_percentage >= 50 ? 'medium' : 'low';

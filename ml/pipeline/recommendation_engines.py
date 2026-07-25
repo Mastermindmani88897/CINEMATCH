@@ -234,7 +234,10 @@ class PersonalizedEngine:
 
         results = []
         for mid in sorted_ids:
-            row_match = self.df[self.df.get("id", self.df.index) == mid]
+            if "id" in self.df.columns:
+                row_match = self.df[self.df["id"] == mid]
+            else:
+                row_match = self.df[self.df.index == mid]
             if row_match.empty:
                 continue
             row = row_match.iloc[0]

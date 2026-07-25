@@ -58,6 +58,26 @@ def train_semantic(df, skip=False):
     return engine
 
 
+def train_pipeline(df=None, skip_semantic=False):
+    """Train all pipeline engines using dataset from MongoDB Atlas or CSVs."""
+    logger.info("Executing full ML pipeline training...")
+    if df is None:
+        try:
+            df = load_and_merge_datasets()
+            df = preprocess(df)
+            save_processed_data(df)
+        except Exception as e:
+            logger.warning(f"Dataset load warning: {e}")
+            return None
+    if df is not None and not df.empty:
+        train_tfidf(df)
+        train_popularity(df)
+        train_semantic(df, skip=skip_semantic)
+        logger.info(f"ML Pipeline re-trained successfully with {len(df)} items ✓")
+        return df
+    return None
+
+
 def main():
     parser = argparse.ArgumentParser(description="Train CineMatch AI ML models")
     parser.add_argument("--skip-semantic", action="store_true", help="Skip Sentence Transformer training")

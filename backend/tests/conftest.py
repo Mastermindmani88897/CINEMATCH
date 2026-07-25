@@ -1,4 +1,6 @@
 import pytest
+import pytest_asyncio
+import httpx
 from mongomock_motor import AsyncMongoMockClient
 from app.main import app
 from app.core import database
@@ -12,3 +14,10 @@ def mock_mongo():
     database.db = mock_db
     yield
     mock_client.close()
+
+
+@pytest_asyncio.fixture
+async def client():
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:
+        yield ac

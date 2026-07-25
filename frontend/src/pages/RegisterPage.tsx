@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
+import { useAuthStore } from '../store/authStore';
 import toast from 'react-hot-toast';
 
 export const RegisterPage: React.FC = () => {
@@ -10,7 +11,13 @@ export const RegisterPage: React.FC = () => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
+  const { isAuthenticated } = useAuthStore();
   const navigate = useNavigate();
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (isAuthenticated) navigate('/', { replace: true });
+  }, [isAuthenticated, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

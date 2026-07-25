@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, List, Any
 from datetime import datetime
 
@@ -24,6 +24,7 @@ class MovieBase(BaseModel):
     release_date: Optional[str] = None
     runtime: Optional[int] = None
     original_language: Optional[str] = None
+    origin_country: Optional[str] = None
     vote_average: float = 0.0
     vote_count: int = 0
     popularity: float = 0.0
@@ -31,6 +32,7 @@ class MovieBase(BaseModel):
 
 class MovieCreate(MovieBase):
     tmdb_id: Optional[int] = None
+    original_title: Optional[str] = None
     tagline: Optional[str] = None
     keywords: Optional[List[str]] = None
     cast: Optional[List[dict]] = None
@@ -57,45 +59,46 @@ class MovieUpdate(BaseModel):
 
 class MovieResponse(MovieBase):
     id: int
-    tmdb_id: Optional[int]
-    tagline: Optional[str]
-    keywords: Optional[List[str]]
-    cast: Optional[List[Any]]
-    crew: Optional[List[Any]]
-    director: Optional[str]
-    production_companies: Optional[List[str]]
-    release_year: Optional[int]
-    poster_path: Optional[str]
-    backdrop_path: Optional[str]
-    trailer_key: Optional[str]
-    imdb_id: Optional[str]
-    budget: Optional[float]
-    revenue: Optional[float]
-    weighted_rating: float
-    trending_score: float
-    created_at: datetime
+    tmdb_id: Optional[int] = None
+    original_title: Optional[str] = None
+    tagline: Optional[str] = None
+    keywords: Optional[List[str]] = None
+    cast: Optional[List[Any]] = None
+    crew: Optional[List[Any]] = None
+    director: Optional[str] = None
+    production_companies: Optional[List[str]] = None
+    release_year: Optional[int] = None
+    poster_path: Optional[str] = None
+    backdrop_path: Optional[str] = None
+    trailer_key: Optional[str] = None
+    imdb_id: Optional[str] = None
+    budget: Optional[float] = None
+    revenue: Optional[float] = None
+    weighted_rating: float = 0.0
+    trending_score: float = 0.0
+    created_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class MovieListResponse(BaseModel):
     id: int
-    tmdb_id: Optional[int]
+    tmdb_id: Optional[int] = None
     title: str
-    overview: Optional[str]
-    genres: Optional[List[str]]
-    release_year: Optional[int]
-    vote_average: float
-    popularity: float
-    weighted_rating: float
-    poster_path: Optional[str]
-    backdrop_path: Optional[str]
-    runtime: Optional[int]
-    original_language: Optional[str]
+    original_title: Optional[str] = None
+    overview: Optional[str] = None
+    genres: Optional[List[str]] = None
+    release_year: Optional[int] = None
+    vote_average: float = 0.0
+    popularity: float = 0.0
+    weighted_rating: float = 0.0
+    poster_path: Optional[str] = None
+    backdrop_path: Optional[str] = None
+    runtime: Optional[int] = None
+    original_language: Optional[str] = None
+    origin_country: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class PaginatedMovies(BaseModel):
@@ -120,8 +123,7 @@ class RatingResponse(BaseModel):
     rating: float
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ReviewCreate(BaseModel):
@@ -138,8 +140,7 @@ class ReviewResponse(BaseModel):
     contains_spoilers: bool
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class NoteCreate(BaseModel):
@@ -151,7 +152,6 @@ class NoteResponse(BaseModel):
     movie_id: int
     content: str
     created_at: datetime
-    updated_at: Optional[datetime]
+    updated_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

@@ -184,6 +184,30 @@ h1, h2, h3, h4, h5, h6 {
   border-color: var(--color-border-hover);
 }
 
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  text-decoration: none;
+}
+
+.btn-secondary:hover {
+  background: var(--color-surface-3);
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 20px rgba(245,197,24,0.2);
+}
+
 .section-title {
   font-family: 'Outfit', sans-serif;
   font-size: clamp(1.5rem, 3vw, 2rem);

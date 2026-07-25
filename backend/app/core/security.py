@@ -6,16 +6,28 @@ from fastapi import HTTPException, status, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from app.core.config import settings
 
+import bcrypt
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 security = HTTPBearer()
 
 
 def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
+    pwd_bytes = password.encode("utf-8")[:72]
+    salt = bcrypt.gensalt()
+    return bcrypt.hashpw(pwd_bytes, salt).decode("utf-8")
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
+    if not hashed_password:
+        return False
+    try:
+        pwd_bytes = plain_password.encode("utf-8")[:72]
+        return bcrypt.checkpw(pwd_bytes, hashed_password.encode("utf-8"))
+    except Exception:
+        try:
+            return pwd_context.verify(plain_password, hashed_password)
+        except Exception:
+            return False
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
@@ -24,31 +36,36 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
         expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     )
     to_encode.update({"exp": expire, "type": "access"})
-    return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+    return jwt.encode(to_encode, settings.JWT_SECRET, algorithm=settings.ALGORITHM)
 
 
 def create_refresh_token(data: dict) -> str:
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
     to_encode.update({"exp": expire, "type": "refresh"})
-    return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+    return jwt.encode(to_encode, settings.JWT_SECRET, algorithm=settings.ALGORITHM)
 
 
 def create_email_verification_token(email: str) -> str:
     expire = datetime.now(timezone.utc) + timedelta(hours=24)
     data = {"sub": email, "exp": expire, "type": "email_verify"}
-    return jwt.encode(data, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+    return jwt.encode(data, settings.JWT_SECRET, algorithm=settings.ALGORITHM)
 
 
 def create_password_reset_token(email: str) -> str:
     expire = datetime.now(timezone.utc) + timedelta(hours=1)
     data = {"sub": email, "exp": expire, "type": "password_reset"}
-    return jwt.encode(data, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+    return jwt.encode(data, settings.JWT_SECRET, algorithm=settings.ALGORITHM)
 
 
 def decode_token(token: str) -> dict:
+    if not settings.JWT_SECRET:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="JWT secret is not configured in environment.",
+        )
     try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        payload = jwt.decode(token, settings.JWT_SECRET, algorithms=[settings.ALGORITHM])
         return payload
     except JWTError:
         raise HTTPException(
