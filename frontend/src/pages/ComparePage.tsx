@@ -44,13 +44,13 @@ export const ComparePage: React.FC = () => {
           <AdjustmentsHorizontalIcon className="w-8 h-8 text-[var(--color-primary-light)]" />
           Side-by-Side Movie Comparison
         </h1>
-        <p className="text-gray-400 text-sm">Compare ratings, popularity, runtime, genres, and ML similarity</p>
+        <p className="text-[var(--color-text-muted)] text-sm">Compare ratings, popularity, runtime, genres, and movie compatibility</p>
       </div>
 
       {similarityScore !== null && (
         <div className="card p-4 text-center max-w-md mx-auto border-amber-500/30">
-          <span className="text-xs font-bold text-amber-400 uppercase tracking-wider block">ML Content Similarity Score</span>
-          <div className="text-3xl font-black text-white font-['Outfit'] mt-1">{(similarityScore * 100).toFixed(1)}% Match</div>
+          <span className="text-xs font-bold text-amber-500 dark:text-amber-400 uppercase tracking-wider block">Overall Movie Compatibility</span>
+          <div className="text-3xl font-black text-[var(--color-text)] font-['Outfit'] mt-1">{(similarityScore * 100).toFixed(1)}% Match</div>
         </div>
       )}
 

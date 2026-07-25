@@ -96,25 +96,55 @@ class ExplanationGenerator:
             "similarity_score": similarity_score,
         }
 
-    def generate_mood_explanation(self, mood: str, movie: Dict) -> str:
-        genres = ", ".join((movie.get("genres") or [])[:3])
-        template = random.choice(MOOD_TEMPLATES)
-        return template.format(mood=mood, shared_features=genres or "great storytelling")
+    def generate_industry_explanation(self, industry: str, movie: Dict) -> str:
+        lang_map = {
+            "tollywood": "Telugu",
+            "bollywood": "Hindi",
+            "kollywood": "Tamil",
+            "mollywood": "Malayalam",
+            "sandalwood": "Kannada",
+            "korean": "Korean",
+            "anime": "Japanese Anime",
+            "japanese": "Japanese",
+            "chinese": "Chinese",
+            "hollywood": "Hollywood",
+            "international": "International",
+        }
+        name = lang_map.get(industry.lower(), industry.capitalize())
+        genres = ", ".join((movie.get("genres") or [])[:2])
+        if genres:
+            return f"Popular {name} film featuring dynamic {genres} storytelling."
+        return f"Trending pick in {name} cinema."
 
-    def generate_genre_explanation(self, genre: str, movie: Dict) -> str:
-        template = random.choice(GENRE_TEMPLATES)
-        return template.format(
-            genre=genre,
-            rating=round(movie.get("vote_average", 0), 1),
-            vote_count=movie.get("vote_count", 0),
-        )
+    def generate_mood_explanation(self, mood: str, movie: Dict) -> str:
+        genres = " & ".join((movie.get("genres") or [])[:2])
+        if genres:
+            return f"Selected for your {mood} mood — delivers engaging {genres} action and drama."
+        return f"Perfect match for a {mood} watch."
+
+    def generate_genre_explanation(self, genres_input: str, movie: Dict) -> str:
+        genres_list = [g.strip() for g in genres_input.split(",") if g.strip()]
+        if len(genres_list) > 1:
+            return f"Recommended because it matches your selected genres ({' + '.join(genres_list)})."
+        elif genres_list:
+            return f"Popular among {genres_list[0]} fans with top audience ratings."
+        return "Top rated recommendation matching your genre preferences."
+
+    def generate_popularity_explanation(self, mode: str, movie: Dict) -> str:
+        rating = round(movie.get("vote_average", 0), 1)
+        if mode == "trending":
+            return f"Trending right now with strong audience interest."
+        elif mode == "top_rated":
+            return f"Critically acclaimed classic rated {rating}/10."
+        elif mode == "popular":
+            return f"Popular blockbusters loved by movie enthusiasts."
+        return f"High-rated recommendation with {rating}/10 star score."
 
     def generate_personalized_explanation(self, movie: Dict, user_genres: List[str]) -> str:
         movie_genres = movie.get("genres") or []
         shared = [g for g in movie_genres if g in user_genres]
-        features = ", ".join(shared[:3]) if shared else "your preferred genres"
-        template = random.choice(PERSONALIZED_TEMPLATES)
-        return template.format(shared_features=features)
+        features = " & ".join(shared[:2]) if shared else "your preferred genres"
+        return f"Tailored for you based on your taste for {features}."
 
     def analyze_taste(self, genre_counts: Dict[str, int], total: int) -> Dict:
         """Generate AI taste personality from genre statistics."""
@@ -137,3 +167,4 @@ class ExplanationGenerator:
             "personality": best_match[0],
             "personality_description": best_match[2],
         }
+

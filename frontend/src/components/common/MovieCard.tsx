@@ -145,13 +145,13 @@ export const MovieCard: React.FC<MovieCardProps> = ({ movie }) => {
         </div>
       </div>
       <div className="mt-2">
-        <h4 className="font-semibold text-white text-sm line-clamp-1 group-hover:text-[var(--color-primary-light)] transition-colors">
+        <h4 className="font-bold text-[var(--color-text)] text-sm line-clamp-1 group-hover:text-[var(--color-primary-light)] transition-colors">
           {movie.title}
         </h4>
-        <div className="flex justify-between items-center text-xs text-gray-400 mt-1">
+        <div className="flex justify-between items-center text-xs text-[var(--color-text-muted)] mt-1">
           <span>{movie.release_year}</span>
-          <span className="flex items-center gap-1 text-[var(--color-accent)] font-medium">
-            <StarIcon className="w-3 h-3" />
+          <span className="flex items-center gap-1 text-[var(--color-accent)] font-semibold">
+            <StarIcon className="w-3.5 h-3.5" />
             {movie.vote_average?.toFixed(1)}
           </span>
         </div>

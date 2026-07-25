@@ -51,6 +51,7 @@ async def search_movies(
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
     genre: Optional[str] = None,
+    genres: Optional[str] = None,
     year: Optional[int] = None,
     language: Optional[str] = None,
     min_rating: float = Query(0.0, ge=0, le=10),
@@ -82,8 +83,13 @@ async def search_movies(
             }
 
         # Apply secondary filters if passed
-        if genre:
-            query_cond["genres"] = genre
+        genres_input = genre or genres
+        if genres_input:
+            g_list = [g.strip() for g in genres_input.split(",") if g.strip()]
+            if len(g_list) > 1:
+                query_cond["genres"] = {"$all": g_list}
+            elif len(g_list) == 1:
+                query_cond["genres"] = g_list[0]
         if year:
             query_cond["release_year"] = year
         if language:

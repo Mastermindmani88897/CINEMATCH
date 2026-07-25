@@ -141,11 +141,16 @@ def format_recs(recs: list, algorithm: str) -> RecommendationResponse:
     return RecommendationResponse(recommendations=items, algorithm=algorithm, total=len(items))
 
 
+from ml.pipeline.explanation_engine import ExplanationGenerator
+
+explainer = ExplanationGenerator()
+
+
 # ── 1. Industry / Regional Recommendations ──────────────────────────────────
 @router.get("/industry/{industry}", response_model=RecommendationResponse)
 async def industry_based(
     industry: str,
-    limit: int = Query(20, ge=1, le=50),
+    limit: int = Query(20, ge=1, le=100),
 ):
     ind_lower = industry.lower().strip()
     db = get_database()
@@ -158,14 +163,18 @@ async def industry_based(
     candidates = [m async for m in cursor]
 
     if not candidates:
-        # Retry without sorting restriction
         cursor = db.movies.find(query).limit(50)
         candidates = [m async for m in cursor]
 
-    # Sample/shuffle candidate pool for recommendation diversity
     if candidates:
         selected = candidates[:limit]
         for m in selected:
+            m_dict = {
+                "title": m.get("title", ""),
+                "genres": m.get("genres", []),
+                "vote_average": m.get("vote_average", 0),
+            }
+            exp_text = explainer.generate_industry_explanation(ind_lower, m_dict)
             recs.append({
                 "movie_id": m.get("id", m.get("tmdb_id")),
                 "title": m.get("title", ""),
@@ -175,7 +184,7 @@ async def industry_based(
                 "genres": m.get("genres", []),
                 "similarity_score": 0.95,
                 "match_percentage": 95,
-                "explanation": f"Top pick from {industry.capitalize()} cinema collection",
+                "explanation": exp_text,
             })
 
     return format_recs(recs, f"industry-{ind_lower}")
@@ -185,7 +194,7 @@ async def industry_based(
 @router.get("/mood/{mood}", response_model=RecommendationResponse)
 async def mood_based(
     mood: str,
-    limit: int = Query(20, ge=1, le=50),
+    limit: int = Query(20, ge=1, le=100),
 ):
     mood_key = mood.lower().replace("-", "").replace(" ", "")
     db = get_database()
@@ -198,14 +207,12 @@ async def mood_based(
         "explanation": f"Recommended films matching {mood.capitalize()} mood"
     })
 
-    # Construct strict query
     query = {
         "genres": {"$in": config["include_genres"]}
     }
     if config.get("exclude_genres"):
         query["genres"]["$nin"] = config["exclude_genres"]
 
-    # Fetch candidate pool (top 150 matching mood query)
     cursor = db.movies.find(query).sort("popularity", -1).limit(150)
     candidates = [m async for m in cursor]
 
@@ -213,7 +220,6 @@ async def mood_based(
         cursor = db.movies.find({"genres": {"$in": config["include_genres"]}}).sort("vote_average", -1).limit(50)
         candidates = [m async for m in cursor]
 
-    # Score candidates based on mood keywords in overview / tagline / genres
     scored = []
     keywords = config.get("keywords", [])
     for m in candidates:
@@ -223,11 +229,16 @@ async def mood_based(
         score += (keyword_matches * 1.5)
         scored.append((score, m))
 
-    # Sort candidates by combined score
     scored.sort(key=lambda x: x[0], reverse=True)
     top_candidates = [m for _, m in scored[:limit]]
 
     for m in top_candidates:
+        m_dict = {
+            "title": m.get("title", ""),
+            "genres": m.get("genres", []),
+            "vote_average": m.get("vote_average", 0),
+        }
+        exp_text = explainer.generate_mood_explanation(mood, m_dict)
         recs.append({
             "movie_id": m.get("id", m.get("tmdb_id")),
             "title": m.get("title", ""),
@@ -237,7 +248,7 @@ async def mood_based(
             "genres": m.get("genres", []),
             "similarity_score": 0.92,
             "match_percentage": 92,
-            "explanation": config["explanation"],
+            "explanation": exp_text,
         })
 
     return format_recs(recs, f"mood-{mood_key}")
@@ -247,14 +258,27 @@ async def mood_based(
 @router.get("/genre", response_model=RecommendationResponse)
 async def genre_based(
     genres: str = Query(..., description="Comma-separated genres"),
-    limit: int = Query(20, ge=1, le=50),
+    limit: int = Query(20, ge=1, le=100),
 ):
     genre_list = [g.strip() for g in genres.split(",") if g.strip()]
     recs = []
     db = get_database()
 
-    cursor = db.movies.find({"genres": {"$in": genre_list}}).sort("popularity", -1).limit(limit)
-    async for m in cursor:
+    # If multiple genres passed, find movies matching all ($all) or at least any ($in)
+    cursor = db.movies.find({"genres": {"$all": genre_list}} if len(genre_list) > 1 else {"genres": {"$in": genre_list}}).sort("popularity", -1).limit(limit)
+    candidates = [m async for m in cursor]
+
+    if not candidates and len(genre_list) > 1:
+        cursor = db.movies.find({"genres": {"$in": genre_list}}).sort("popularity", -1).limit(limit)
+        candidates = [m async for m in cursor]
+
+    for m in candidates:
+        m_dict = {
+            "title": m.get("title", ""),
+            "genres": m.get("genres", []),
+            "vote_average": m.get("vote_average", 0),
+        }
+        exp_text = explainer.generate_genre_explanation(genres, m_dict)
         recs.append({
             "movie_id": m.get("id", m.get("tmdb_id")),
             "title": m.get("title", ""),
@@ -264,7 +288,7 @@ async def genre_based(
             "genres": m.get("genres", []),
             "similarity_score": 0.88,
             "match_percentage": 88,
-            "explanation": f"Top rated in {', '.join(genre_list)}",
+            "explanation": exp_text,
         })
 
     return format_recs(recs, "genre-based")
@@ -273,7 +297,7 @@ async def genre_based(
 # ── 4. Popularity-Based Recommendations ────────────────────────────────────
 @router.get("/popular", response_model=RecommendationResponse)
 async def popularity_based(
-    limit: int = Query(20, ge=1, le=50),
+    limit: int = Query(20, ge=1, le=100),
     mode: str = Query("weighted", pattern="^(weighted|trending|popular|top_rated)$"),
 ):
     db = get_database()
@@ -282,6 +306,12 @@ async def popularity_based(
 
     cursor = db.movies.find({}).sort(sort_field, -1).limit(limit)
     async for m in cursor:
+        m_dict = {
+            "title": m.get("title", ""),
+            "genres": m.get("genres", []),
+            "vote_average": m.get("vote_average", 0),
+        }
+        exp_text = explainer.generate_popularity_explanation(mode, m_dict)
         recs.append({
             "movie_id": m.get("id", m.get("tmdb_id")),
             "title": m.get("title", ""),
@@ -291,7 +321,7 @@ async def popularity_based(
             "genres": m.get("genres", []),
             "similarity_score": 0.90,
             "match_percentage": 90,
-            "explanation": f"Highest ranked in {mode.replace('_', ' ').capitalize()} collection",
+            "explanation": exp_text,
         })
 
     return format_recs(recs, f"popularity-{mode}")
@@ -304,7 +334,6 @@ async def semantic_search(request: SemanticSearchRequest):
     db = get_database()
     q_clean = request.query.strip()
 
-    # Query regex across multiple fields
     cursor = db.movies.find({
         "$or": [
             {"title": {"$regex": q_clean, "$options": "i"}},
@@ -325,7 +354,7 @@ async def semantic_search(request: SemanticSearchRequest):
             "genres": m.get("genres", []),
             "similarity_score": 0.89,
             "match_percentage": 89,
-            "explanation": f"Matches semantic prompt: '{q_clean}'",
+            "explanation": f"Handpicked match based on your query: '{q_clean}'",
         })
 
     return format_recs(recs, "semantic-search")

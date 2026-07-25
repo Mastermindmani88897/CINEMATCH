@@ -167,7 +167,7 @@ export const RecommendationPage: React.FC = () => {
 
         {activeTab === 'industry' && (
           <div className="space-y-4">
-            <h3 className="font-bold text-white text-sm">Select Industry / Regional Cinema:</h3>
+            <h3 className="font-bold text-[var(--color-text)] text-sm">Select Industry / Regional Cinema:</h3>
             <div className="flex flex-wrap gap-2.5">
               {INDUSTRIES.map((ind) => (
                 <button
@@ -184,7 +184,7 @@ export const RecommendationPage: React.FC = () => {
 
         {activeTab === 'mood' && (
           <div className="space-y-4">
-            <h3 className="font-bold text-white text-sm">Select Mood:</h3>
+            <h3 className="font-bold text-[var(--color-text)] text-sm">Select Mood:</h3>
             <div className="flex flex-wrap gap-2.5">
               {MOODS.map((m) => (
                 <button
@@ -201,7 +201,14 @@ export const RecommendationPage: React.FC = () => {
 
         {activeTab === 'genre' && (
           <div className="space-y-4">
-            <h3 className="font-bold text-white text-sm">Select Genres:</h3>
+            <div className="flex justify-between items-center">
+              <h3 className="font-bold text-[var(--color-text)] text-sm">Select Genres (Multi-Select Supported):</h3>
+              {selectedGenres.length > 0 && (
+                <span className="text-xs text-[var(--color-primary-light)] font-bold">
+                  {selectedGenres.length} Selected ({selectedGenres.join(' + ')})
+                </span>
+              )}
+            </div>
             <div className="flex flex-wrap gap-2">
               {allGenres.map((g) => (
                 <button
@@ -211,9 +218,9 @@ export const RecommendationPage: React.FC = () => {
                       prev.includes(g) ? prev.filter((x) => x !== g) : [...prev, g]
                     )
                   }
-                  className={`genre-pill text-xs ${selectedGenres.includes(g) ? 'active' : ''}`}
+                  className={`genre-pill text-xs ${selectedGenres.includes(g) ? 'active shadow-sm' : ''}`}
                 >
-                  {g}
+                  {selectedGenres.includes(g) ? `✓ ${g}` : g}
                 </button>
               ))}
             </div>

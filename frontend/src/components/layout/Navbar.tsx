@@ -31,7 +31,7 @@ export const Navbar: React.FC = () => {
           <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[var(--color-primary)] to-[var(--color-accent)] flex items-center justify-center shadow-lg shadow-[var(--color-primary)]/20 group-hover:scale-105 transition-transform">
             <FilmIcon className="w-6 h-6 text-white" />
           </div>
-          <span className="font-extrabold text-xl tracking-tight text-white font-['Outfit']">
+          <span className="font-extrabold text-xl tracking-tight text-[var(--color-text)] font-['Outfit']">
             Cine<span className="gradient-text">Match</span> AI
           </span>
         </Link>
@@ -41,7 +41,7 @@ export const Navbar: React.FC = () => {
           <Link
             to="/"
             className={`font-medium transition-colors hover:text-[var(--color-primary-light)] ${
-              isActive('/') ? 'text-[var(--color-primary-light)] font-semibold' : 'text-gray-300'
+              isActive('/') ? 'text-[var(--color-primary-light)] font-semibold' : 'text-[var(--color-text-muted)]'
             }`}
           >
             Home
@@ -49,7 +49,7 @@ export const Navbar: React.FC = () => {
           <Link
             to="/recommendations"
             className={`flex items-center gap-1.5 font-medium transition-colors hover:text-[var(--color-accent)] ${
-              isActive('/recommendations') ? 'text-[var(--color-accent)] font-semibold' : 'text-gray-300'
+              isActive('/recommendations') ? 'text-[var(--color-accent)] font-semibold' : 'text-[var(--color-text-muted)]'
             }`}
           >
             <SparklesIcon className="w-4 h-4 text-[var(--color-accent)] animate-pulse" />
@@ -58,15 +58,15 @@ export const Navbar: React.FC = () => {
           <Link
             to="/search"
             className={`font-medium transition-colors hover:text-[var(--color-primary-light)] ${
-              isActive('/search') ? 'text-[var(--color-primary-light)] font-semibold' : 'text-gray-300'
+              isActive('/search') ? 'text-[var(--color-primary-light)] font-semibold' : 'text-[var(--color-text-muted)]'
             }`}
           >
             Search
           </Link>
           <Link
             to="/compare"
-            className={`flex items-center gap-1 font-medium transition-colors hover:text-gray-100 ${
-              isActive('/compare') ? 'text-white font-semibold' : 'text-gray-300'
+            className={`flex items-center gap-1 font-medium transition-colors hover:text-[var(--color-text)] ${
+              isActive('/compare') ? 'text-[var(--color-text)] font-semibold' : 'text-[var(--color-text-muted)]'
             }`}
           >
             <AdjustmentsHorizontalIcon className="w-4 h-4" />

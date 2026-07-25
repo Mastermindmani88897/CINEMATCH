@@ -99,6 +99,7 @@ async def list_movies(
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
     genre: Optional[str] = None,
+    genres: Optional[str] = None,
     industry: Optional[str] = None,
     year: Optional[int] = None,
     language: Optional[str] = None,
@@ -112,17 +113,35 @@ async def list_movies(
         query = {}
 
         # Handle Industry / Language aliasing
-        target_ind = (industry or language or genre or "").lower().strip()
+        target_ind = (industry or language or "").lower().strip()
         if target_ind in INDUSTRY_LANG_MAP:
             query["original_language"] = INDUSTRY_LANG_MAP[target_ind]
             if target_ind == "anime":
                 query["genres"] = "Animation"
-        elif genre and genre.lower().strip() not in INDUSTRY_LANG_MAP:
-            query["genres"] = genre
+
+        # Handle Multi-Select Genres (e.g., "Action,Adventure")
+        genres_input = genre or genres
+        if genres_input:
+            g_list = [g.strip() for g in genres_input.split(",") if g.strip()]
+            real_genres = []
+            for g in g_list:
+                if g.lower() in INDUSTRY_LANG_MAP and "original_language" not in query:
+                    query["original_language"] = INDUSTRY_LANG_MAP[g.lower()]
+                    if g.lower() == "anime":
+                        real_genres.append("Animation")
+                elif g.lower() not in INDUSTRY_LANG_MAP:
+                    real_genres.append(g)
+
+            if len(real_genres) > 1:
+                query["genres"] = {"$all": real_genres}
+            elif len(real_genres) == 1:
+                query["genres"] = real_genres[0]
 
         if year:
             query["release_year"] = year
-        if language and language.lower().strip() not in INDUSTRY_LANG_MAP and "original_language" not in query:
+        if language and language.lower().strip() in INDUSTRY_LANG_MAP and "original_language" not in query:
+            query["original_language"] = INDUSTRY_LANG_MAP[language.lower().strip()]
+        elif language and "original_language" not in query:
             query["original_language"] = language
         if country:
             query["origin_country"] = country

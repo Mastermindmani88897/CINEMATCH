@@ -52,23 +52,31 @@ export const RecommendationCard: React.FC<RecommendationCardProps> = ({ item }) 
           </div>
 
           {item.explanation && (
-            <div className="mt-3 p-2.5 rounded-lg bg-[var(--color-surface-2)] border border-[var(--color-border)] text-xs text-gray-300 leading-relaxed flex items-start gap-2">
+            <div className="mt-3 p-3 rounded-xl bg-[var(--color-surface-2)] border border-[var(--color-border)] text-xs text-[var(--color-text-muted)] leading-relaxed flex items-start gap-2.5 shadow-sm">
               <InformationCircleIcon className="w-4 h-4 text-[var(--color-accent)] shrink-0 mt-0.5" />
               <div>
-                <span className="font-semibold text-gray-200">Why recommended: </span>
+                <span className="font-bold text-[var(--color-text)]">Why recommended: </span>
                 {item.explanation}
               </div>
             </div>
           )}
         </div>
 
-        <div className="mt-4 flex items-center justify-between pt-2 border-t border-[var(--color-border)]">
-          <span className="text-[11px] text-gray-400 font-mono">
-            Cosine Similarity: {item.similarity_score.toFixed(4)}
-          </span>
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 pt-2.5 border-t border-[var(--color-border)]">
+          <div className="flex flex-wrap items-center gap-2 text-[11px] text-[var(--color-text-dim)] font-medium">
+            <span className="px-2 py-0.5 rounded bg-[var(--color-surface-3)] font-semibold text-[var(--color-text)]">
+              {item.vote_average >= 8.0 ? '🔥 High Ratings' : '⭐ IMDb ' + item.vote_average.toFixed(1)}
+            </span>
+            <span>•</span>
+            <span className="text-emerald-500 font-semibold flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block animate-pulse"></span>
+              Available to Stream
+            </span>
+          </div>
+
           <Link
             to={`/movies/${item.movie_id}`}
-            className="text-xs font-semibold text-[var(--color-primary-light)] hover:underline flex items-center gap-1"
+            className="text-xs font-bold text-[var(--color-primary-light)] hover:underline flex items-center gap-1"
           >
             View Details &rarr;
           </Link>
