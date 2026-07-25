@@ -66,7 +66,22 @@ class MovieResponse(MovieBase):
     cast: Optional[List[Any]] = None
     crew: Optional[List[Any]] = None
     director: Optional[str] = None
+    writers: Optional[List[str]] = None
+    screenplay: Optional[List[str]] = None
+    story: Optional[List[str]] = None
+    producers: Optional[List[str]] = None
+    executive_producers: Optional[List[str]] = None
+    music_composers: Optional[List[str]] = None
+    editors: Optional[List[str]] = None
+    cinematographers: Optional[List[str]] = None
     production_companies: Optional[List[str]] = None
+    distributors: Optional[List[str]] = None
+    spoken_languages: Optional[List[str]] = None
+    collection: Optional[Any] = None
+    homepage: Optional[str] = None
+    status: Optional[str] = None
+    certification: Optional[str] = None
+    streaming_providers: Optional[List[str]] = None
     release_year: Optional[int] = None
     poster_path: Optional[str] = None
     backdrop_path: Optional[str] = None
@@ -131,14 +146,22 @@ class ReviewCreate(BaseModel):
     contains_spoilers: bool = False
 
 
+class ReviewUpdate(BaseModel):
+    content: str
+    contains_spoilers: Optional[bool] = False
+
+
 class ReviewResponse(BaseModel):
     id: int
     movie_id: int
     user_id: int
+    username: Optional[str] = "Anonymous"
+    user_avatar: Optional[str] = None
     content: str
-    likes: int
-    contains_spoilers: bool
+    likes: int = 0
+    contains_spoilers: bool = False
     created_at: datetime
+    updated_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -155,3 +178,8 @@ class NoteResponse(BaseModel):
     updated_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+ReviewCreate.model_rebuild()
+ReviewUpdate.model_rebuild()
+ReviewResponse.model_rebuild()

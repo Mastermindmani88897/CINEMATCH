@@ -117,8 +117,11 @@ async def search_tmdb_movies(query: str, page: int = 1) -> Dict[str, Any]:
 
 
 async def get_movie_details(movie_id: int) -> Dict[str, Any]:
-    """Fetch movie details from TMDB."""
-    return await _tmdb_request(f"movie/{movie_id}")
+    """Fetch movie details from TMDB with full credits, keywords, videos, and release dates."""
+    return await _tmdb_request(
+        f"movie/{movie_id}",
+        {"append_to_response": "credits,keywords,videos,images,release_dates,external_ids"}
+    )
 
 
 async def get_movie_cast(movie_id: int) -> Dict[str, Any]:

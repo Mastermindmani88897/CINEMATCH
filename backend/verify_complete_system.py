@@ -95,9 +95,12 @@ async def run_full_verification():
         print(f"\n[PHASE 9 - MOVIE DETAILS ROUTING AUDIT]")
         res_movie = await client.get("/api/movies/77")
         assert res_movie.status_code == 200
-        movie_title = res_movie.json().get("title")
-        print(f"  - Movie ID 77 Details Returned Title: '{movie_title}'")
+        m_json = res_movie.json()
+        movie_title = m_json.get("title")
+        print(f"  - Movie ID 77 Details Returned Title: '{movie_title}' | Director: '{m_json.get('director')}'")
         assert movie_title == "Inception", f"Expected 'Inception' for ID 77, got '{movie_title}'"
+        assert "director" in m_json, "Director field missing in movie details response!"
+        assert "writers" in m_json, "Writers field missing in movie details response!"
 
         # 8. Authentication Pipeline Verification
         print(f"\n[PHASE 3 - AUTHENTICATION PIPELINE AUDIT]")
@@ -128,10 +131,45 @@ async def run_full_verification():
         headers = {"Authorization": f"Bearer {tokens['access_token']}"}
         r_me = await client.get("/api/auth/me", headers=headers)
         assert r_me.status_code == 200, "Protected endpoint /auth/me failed!"
-        print(f"  - Protected Endpoint GET /auth/me Verified! Username: {r_me.json()['username']}")
+        logged_in_username = r_me.json()["username"]
+        print(f"  - Protected Endpoint GET /auth/me Verified! Username: {logged_in_username}")
+
+        # 9. Review System Audit (Username Resolution, Edit, Delete)
+        print(f"\n[PHASE 12 - REVIEW SYSTEM USERNAME & EDIT/DELETE AUDIT]")
+        r_post_rev = await client.post("/api/users/movies/77/reviews", json={
+            "content": "Masterpiece film with stellar visuals!",
+            "contains_spoilers": False
+        }, headers=headers)
+        assert r_post_rev.status_code == 200, f"Posting review failed: {r_post_rev.text}"
+        rev_data = r_post_rev.json()
+        rev_id = rev_data["id"]
+        assert rev_data["username"] == logged_in_username, f"Expected review username '{logged_in_username}', got '{rev_data.get('username')}'"
+
+        # Fetch reviews for movie 77
+        r_get_revs = await client.get("/api/users/movies/77/reviews")
+        assert r_get_revs.status_code == 200
+        revs_list = r_get_revs.json()
+        matching_rev = next((r for r in revs_list if r["id"] == rev_id), None)
+        assert matching_rev is not None, "Created review not found in movie review list"
+        assert matching_rev["username"] == logged_in_username, f"Username resolution failed! Expected '{logged_in_username}', got '{matching_rev.get('username')}'"
+        print(f"  - Posted Review Username Verified: '{matching_rev['username']}' (No 'User #X' placeholder!)")
+
+        # Edit Review
+        r_edit_rev = await client.put(f"/api/users/reviews/{rev_id}", json={
+            "content": "Updated review content: Absolute sci-fi masterpiece!",
+            "contains_spoilers": False
+        }, headers=headers)
+        assert r_edit_rev.status_code == 200, f"Updating review failed: {r_edit_rev.text}"
+        assert r_edit_rev.json()["content"] == "Updated review content: Absolute sci-fi masterpiece!"
+        print("  - Edit Review Endpoint Verified!")
+
+        # Delete Review
+        r_del_rev = await client.delete(f"/api/users/reviews/{rev_id}", headers=headers)
+        assert r_del_rev.status_code == 200, f"Deleting review failed: {r_del_rev.text}"
+        print("  - Delete Review Endpoint Verified!")
 
     print("\n" + "=" * 70)
-    print("      ALL 16 PHASES VERIFIED & SYSTEM AUDIT PASSED 100%")
+    print("      ALL PHASES & ADVANCED SYSTEM AUDITS PASSED 100%")
     print("=" * 70)
 
 if __name__ == "__main__":

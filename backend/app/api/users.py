@@ -1,6 +1,6 @@
 """User routes: favorites, watchlist, history, ratings, reviews, notes using MongoDB Atlas."""
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Body
 from typing import List, Optional
 from datetime import datetime, timezone
 
@@ -9,7 +9,7 @@ from app.core.deps import get_current_active_user
 from app.core.utils import serialize_doc
 from app.schemas.movie import (
     MovieListResponse, RatingCreate, RatingResponse,
-    ReviewCreate, ReviewResponse, NoteCreate, NoteResponse
+    ReviewCreate, ReviewUpdate, ReviewResponse, NoteCreate, NoteResponse
 )
 
 router = APIRouter(prefix="/users", tags=["Users"])
@@ -199,8 +199,24 @@ async def get_reviews(movie_id: int):
     db = get_database()
     cursor = db.reviews.find({"movie_id": movie_id}).sort("created_at", -1)
     reviews = [serialize_doc(r) async for r in cursor]
+    if not reviews:
+        return []
+
+    # Dynamically resolve latest usernames and avatars from users collection
+    user_ids = list(set(r.get("user_id") for r in reviews if r.get("user_id") is not None))
+    user_map = {}
+    if user_ids:
+        u_cursor = db.users.find({"id": {"$in": user_ids}})
+        async for u in u_cursor:
+            user_map[u.get("id")] = u
+
     for idx, r in enumerate(reviews):
         r["id"] = r.get("id", idx + 1)
+        uid = r.get("user_id")
+        user_info = user_map.get(uid, {})
+        r["username"] = user_info.get("username") or r.get("username") or f"User #{uid}"
+        r["user_avatar"] = user_info.get("avatar") or r.get("user_avatar")
+
     return [ReviewResponse.model_validate(r) for r in reviews]
 
 
@@ -212,10 +228,13 @@ async def create_review(
 ):
     db = get_database()
     now = datetime.now(timezone.utc)
-    count = await db.reviews.count_documents({})
+    max_rev = await db.reviews.find_one(sort=[("id", -1)])
+    next_id = (max_rev.get("id", 0) + 1) if max_rev and isinstance(max_rev.get("id"), int) else 1
     doc = {
-        "id": count + 1,
+        "id": next_id,
         "user_id": current_user["id"],
+        "username": current_user.get("username", "CineMatch User"),
+        "user_avatar": current_user.get("avatar"),
         "movie_id": movie_id,
         "content": data.content,
         "likes": 0,
@@ -226,6 +245,49 @@ async def create_review(
     res = await db.reviews.insert_one(doc)
     doc["_id"] = str(res.inserted_id)
     return ReviewResponse.model_validate(serialize_doc(doc))
+
+
+@router.put("/reviews/{review_id}", response_model=ReviewResponse)
+async def update_review(
+    review_id: int,
+    data: ReviewUpdate = Body(...),
+    current_user: dict = Depends(get_current_active_user),
+):
+    db = get_database()
+    review = await db.reviews.find_one({"id": review_id})
+    if not review:
+        raise HTTPException(status_code=404, detail="Review not found")
+    if review.get("user_id") != current_user["id"] and not current_user.get("is_admin"):
+        raise HTTPException(status_code=403, detail="Not authorized to edit this review")
+
+    now = datetime.now(timezone.utc)
+    update_fields = {
+        "content": data.content,
+        "contains_spoilers": data.contains_spoilers,
+        "updated_at": now,
+    }
+    await db.reviews.update_one({"id": review_id}, {"$set": update_fields})
+    updated = await db.reviews.find_one({"id": review_id})
+    updated_doc = serialize_doc(updated)
+    updated_doc["username"] = current_user.get("username")
+    updated_doc["user_avatar"] = current_user.get("avatar")
+    return ReviewResponse.model_validate(updated_doc)
+
+
+@router.delete("/reviews/{review_id}")
+async def delete_review(
+    review_id: int,
+    current_user: dict = Depends(get_current_active_user),
+):
+    db = get_database()
+    review = await db.reviews.find_one({"id": review_id})
+    if not review:
+        raise HTTPException(status_code=404, detail="Review not found")
+    if review.get("user_id") != current_user["id"] and not current_user.get("is_admin"):
+        raise HTTPException(status_code=403, detail="Not authorized to delete this review")
+
+    await db.reviews.delete_one({"id": review_id})
+    return {"message": "Review deleted successfully"}
 
 
 # ── Notes ───────────────────────────────────────────────────────────────────

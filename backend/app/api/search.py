@@ -74,6 +74,8 @@ async def search_movies(
                     {"overview": {"$regex": q, "$options": "i"}},
                     {"director": {"$regex": q, "$options": "i"}},
                     {"cast.name": {"$regex": q, "$options": "i"}},
+                    {"crew.name": {"$regex": q, "$options": "i"}},
+                    {"production_companies": {"$regex": q, "$options": "i"}},
                     {"genres": {"$regex": q, "$options": "i"}},
                     {"original_language": {"$regex": q, "$options": "i"}},
                     {"origin_country": {"$regex": q, "$options": "i"}},

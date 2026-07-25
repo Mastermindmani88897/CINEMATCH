@@ -66,8 +66,9 @@ export const SearchBar: React.FC<SearchBarProps> = ({
     if (s.movie_id) {
       navigate(`/movies/${s.movie_id}`);
     } else {
-      setQuery(s.query);
-      navigate(`/search?q=${encodeURIComponent(s.query)}`);
+      const qVal = s.query || s.title || '';
+      setQuery(qVal);
+      navigate(`/search?q=${encodeURIComponent(qVal)}`);
     }
   };
 

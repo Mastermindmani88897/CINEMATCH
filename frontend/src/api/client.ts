@@ -187,6 +187,14 @@ export const userApi = {
     const { data } = await api.post<ReviewResponse>(`/users/movies/${movieId}/reviews`, { content, contains_spoilers: containsSpoilers });
     return data;
   },
+  updateReview: async (reviewId: number, content: string, containsSpoilers = false) => {
+    const { data } = await api.put<ReviewResponse>(`/users/reviews/${reviewId}`, { content, contains_spoilers: containsSpoilers });
+    return data;
+  },
+  deleteReview: async (reviewId: number) => {
+    const { data } = await api.delete<{ message: string }>(`/users/reviews/${reviewId}`);
+    return data;
+  },
   getNote: async (movieId: number) => {
     const { data } = await api.get<NoteResponse | null>(`/users/me/notes/${movieId}`);
     return data;

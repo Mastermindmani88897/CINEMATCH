@@ -22,7 +22,22 @@ export interface Movie {
   cast?: CastMember[];
   crew?: CrewMember[];
   director?: string;
+  writers?: string[];
+  screenplay?: string[];
+  story?: string[];
+  producers?: string[];
+  executive_producers?: string[];
+  music_composers?: string[];
+  editors?: string[];
+  cinematographers?: string[];
   production_companies?: string[];
+  distributors?: string[];
+  spoken_languages?: string[];
+  collection?: any;
+  homepage?: string;
+  status?: string;
+  certification?: string;
+  streaming_providers?: string[];
   runtime?: number;
   release_date?: string;
   release_year?: number;
@@ -30,6 +45,7 @@ export interface Movie {
   vote_count: number;
   popularity: number;
   original_language?: string;
+  origin_country?: string;
   budget?: number;
   revenue?: number;
   poster_path?: string;
@@ -104,9 +120,12 @@ export interface TasteAnalysis {
 }
 
 export interface SearchSuggestion {
-  query: string;
-  type: 'movie' | 'actor' | 'director' | 'genre';
+  id?: number;
+  title?: string;
+  query?: string;
+  type?: 'movie' | 'actor' | 'director' | 'genre';
   movie_id?: number;
+  release_year?: number;
   poster_path?: string;
 }
 
@@ -121,10 +140,13 @@ export interface ReviewResponse {
   id: number;
   movie_id: number;
   user_id: number;
+  username?: string;
+  user_avatar?: string;
   content: string;
   likes: number;
   contains_spoilers: boolean;
   created_at: string;
+  updated_at?: string;
 }
 
 export interface NoteResponse {

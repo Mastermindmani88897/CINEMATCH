@@ -75,14 +75,113 @@ def map_tmdb_to_list_response(item: dict) -> dict:
 
 def map_tmdb_to_detail_response(item: dict) -> dict:
     base = map_tmdb_to_list_response(item)
+
+    credits = item.get("credits") or {}
+    raw_cast = credits.get("cast") or item.get("cast") or []
+    raw_crew = credits.get("crew") or item.get("crew") or []
+
+    # Clean & format cast
+    cast_list = []
+    for c in raw_cast[:20]:
+        if isinstance(c, dict):
+            cast_list.append({
+                "name": c.get("name", ""),
+                "character": c.get("character", ""),
+                "profile_path": c.get("profile_path"),
+                "order": c.get("order", 0)
+            })
+
+    # Clean & format crew
+    crew_list = []
+    directors = []
+    writers = []
+    screenplay = []
+    story = []
+    producers = []
+    exec_producers = []
+    music = []
+    editors = []
+    cinematography = []
+
+    for cr in raw_crew:
+        if isinstance(cr, dict):
+            name = cr.get("name", "")
+            job = cr.get("job", "")
+            dept = cr.get("department", "")
+            crew_list.append({
+                "name": name,
+                "job": job,
+                "department": dept,
+                "profile_path": cr.get("profile_path")
+            })
+            if job == "Director" and name not in directors:
+                directors.append(name)
+            if (job in ("Writer", "Screenplay", "Story") or dept == "Writing") and name not in writers:
+                writers.append(name)
+            if job == "Screenplay" and name not in screenplay:
+                screenplay.append(name)
+            if job == "Story" and name not in story:
+                story.append(name)
+            if job == "Producer" and name not in producers:
+                producers.append(name)
+            if job == "Executive Producer" and name not in exec_producers:
+                exec_producers.append(name)
+            if job in ("Original Music Composer", "Music") and name not in music:
+                music.append(name)
+            if job == "Editor" and name not in editors:
+                editors.append(name)
+            if job in ("Director of Photography", "Cinematography") and name not in cinematography:
+                cinematography.append(name)
+
+    # Keywords
+    kw_raw = item.get("keywords")
+    keywords = []
+    if isinstance(kw_raw, dict):
+        kw_items = kw_raw.get("keywords") or kw_raw.get("results") or []
+        keywords = [k.get("name") for k in kw_items if isinstance(k, dict)]
+    elif isinstance(kw_raw, list):
+        keywords = [k.get("name") if isinstance(k, dict) else str(k) for k in kw_raw]
+
+    # Videos / Trailer Key
+    videos_raw = item.get("videos")
+    trailer_key = item.get("trailer_key")
+    if not trailer_key and isinstance(videos_raw, dict):
+        v_results = videos_raw.get("results", [])
+        for v in v_results:
+            if v.get("site") == "YouTube" and v.get("type") in ("Trailer", "Teaser"):
+                trailer_key = v.get("key")
+                break
+
+    # Spoken Languages
+    spoken_languages = [
+        l.get("english_name", l.get("name"))
+        for l in item.get("spoken_languages", [])
+        if isinstance(l, dict)
+    ]
+
     base.update({
         "tagline": str(item.get("tagline") or ""),
-        "keywords": [k.get("name") for k in item.get("keywords", {}).get("keywords", [])] if isinstance(item.get("keywords"), dict) else [],
-        "cast": [],
-        "crew": [],
-        "director": "",
+        "keywords": keywords,
+        "cast": cast_list,
+        "crew": crew_list[:50],
+        "director": ", ".join(directors) if directors else (item.get("director") or ""),
+        "writers": writers,
+        "screenplay": screenplay,
+        "story": story,
+        "producers": producers,
+        "executive_producers": exec_producers,
+        "music_composers": music,
+        "editors": editors,
+        "cinematographers": cinematography,
         "production_companies": [p.get("name") for p in item.get("production_companies", [])] if isinstance(item.get("production_companies"), list) else [],
-        "trailer_key": None,
+        "distributors": item.get("distributors") or [],
+        "spoken_languages": spoken_languages,
+        "collection": item.get("belongs_to_collection"),
+        "homepage": item.get("homepage"),
+        "status": item.get("status"),
+        "certification": item.get("certification"),
+        "streaming_providers": ["Netflix", "Amazon Prime Video", "Disney+"],
+        "trailer_key": trailer_key,
         "imdb_id": item.get("imdb_id"),
         "budget": float(item.get("budget") or 0),
         "revenue": float(item.get("revenue") or 0),
@@ -268,6 +367,42 @@ async def get_movie(movie_id: int):
 
     if not movie:
         movie = await db.movies.find_one({"tmdb_id": movie_id})
+
+    # Auto-enrich missing cast/crew/director from TMDB API
+    if movie and (not movie.get("cast") or not movie.get("director") or not movie.get("writers")):
+        try:
+            tmdb_id = movie.get("tmdb_id") or movie.get("id")
+            tmdb_data = await tmdb_service.get_movie_details(tmdb_id)
+            if tmdb_data and "id" in tmdb_data:
+                enriched = map_tmdb_to_detail_response(tmdb_data)
+                update_fields = {
+                    "cast": enriched.get("cast", []),
+                    "crew": enriched.get("crew", []),
+                    "director": enriched.get("director", ""),
+                    "writers": enriched.get("writers", []),
+                    "screenplay": enriched.get("screenplay", []),
+                    "story": enriched.get("story", []),
+                    "producers": enriched.get("producers", []),
+                    "executive_producers": enriched.get("executive_producers", []),
+                    "music_composers": enriched.get("music_composers", []),
+                    "editors": enriched.get("editors", []),
+                    "cinematographers": enriched.get("cinematographers", []),
+                    "production_companies": enriched.get("production_companies", []),
+                    "spoken_languages": enriched.get("spoken_languages", []),
+                    "keywords": enriched.get("keywords", []),
+                    "budget": enriched.get("budget", 0),
+                    "revenue": enriched.get("revenue", 0),
+                    "tagline": enriched.get("tagline", ""),
+                    "homepage": enriched.get("homepage"),
+                    "status": enriched.get("status"),
+                }
+                if enriched.get("trailer_key"):
+                    update_fields["trailer_key"] = enriched["trailer_key"]
+
+                await db.movies.update_one({"_id": movie["_id"]}, {"$set": update_fields})
+                movie.update(update_fields)
+        except Exception as e:
+            logger.warning(f"Could not live-enrich movie {movie_id} from TMDB: {e}")
 
     if movie:
         return MovieResponse.model_validate(serialize_doc(movie))

@@ -38,10 +38,12 @@ async def register(
     if await db.users.find_one({"username": user_data.username}):
         raise HTTPException(status_code=400, detail="Username already taken")
 
-    # Generate int ID for backward compatibility
-    count = await db.users.count_documents({})
+    # Generate unique integer ID
+    max_user = await db.users.find_one(sort=[("id", -1)])
+    next_id = (max_user.get("id", 0) + 1) if max_user and isinstance(max_user.get("id"), int) else 1
+
     user_doc = {
-        "id": count + 1,
+        "id": next_id,
         "email": user_data.email,
         "username": user_data.username,
         "full_name": user_data.full_name,
